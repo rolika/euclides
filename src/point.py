@@ -1,0 +1,89 @@
+"""
+EUCLIDES
+A geometric shooter
+"""
+
+import math
+
+
+class Point:
+    """ Class to create and move 2-dimensional points """
+
+    def __init__(self, x=0, y=0):
+        """ A point is defined by its x and y coordinates """
+        self.__x = x
+        self.__y = y
+
+    def __str__(self):
+        """ String representation of a point: (x,y) """
+        return "({},{})".format(self.__x, self.__y)
+
+    @property
+    def x(self):
+        """ Return the x coordinate in pixels, always as integer """
+        return round(self.__x)
+
+    @property
+    def y(self):
+        """ Return the y coordinate in pixels, always as integer """
+        return round(self.__y)
+
+    @x.setter
+    def x(self, x):
+        """ Set the x coordinate in pixels """
+        self.__x = x
+
+    @y.setter
+    def y(self, y):
+        """ Set the y coordinate in pixels """
+        self.__y = y
+
+    def distance(self, other):
+        """ Return the distance between this and other point """
+        return math.sqrt((self.__x - other.x)**2 + (self.__y - other.y)**2)
+
+    def offset(self, offset_x, offset_y):
+        """ Offset this point by offset_y and offset_y pixels """
+        self.__x += offset_x
+        self.__y += offset_y
+
+    def shift(self, distance, angle):
+        """ Shift this point at angle to distance
+        If angle is float, threat it as radians, if integer, as degrees """
+        if isinstance(angle, int):
+            angle = math.radians(angle)
+        offset_x = distance * math.cos(angle)
+        offset_y = distance * math.sin(angle)
+        self.offset(offset_x, offset_y)
+
+    def rotate(self, center, angle):
+        """ Rotate this point around centerpoint at angle
+        If angle is float, threat it as radians, if integer, as degrees """
+        if isinstance(angle, int):
+            angle = math.radians(angle)
+        radius = self.distance(center)
+        complementer_angle = (self.y - center.y) / radius
+        distance = 2 * radius * math.tan(angle / 2)
+        self.shift(distance, angle + complementer_angle)
+
+
+def test():
+    """ Testing this class """
+    o = Point(0, 0)
+    p = Point(2, 2)
+    print(p)
+    p.x = 3
+    p.y = 4
+    print(p)
+    q = Point(9, 10)
+    print(q.distance(p))
+    p.shift(2, 0)  # push point horizontally by 2 pixels
+    print(p)
+    p.shift(math.sqrt(2), 45)
+    print(p)
+    q.rotate(o, 90)
+    print(q)
+
+
+if __name__ == "__main__":
+    test()
