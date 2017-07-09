@@ -42,7 +42,7 @@ class Point:
         """ Return the distance between this and other point """
         return math.sqrt((self.__x - other.x)**2 + (self.__y - other.y)**2)
 
-    def offset(self, offset_x, offset_y):
+    def move(self, offset_x, offset_y):
         """ Offset this point by offset_y and offset_y pixels """
         self.__x += offset_x
         self.__y += offset_y
@@ -54,7 +54,7 @@ class Point:
             angle = math.radians(angle)
         offset_x = distance * math.cos(angle)
         offset_y = distance * math.sin(angle)
-        self.offset(offset_x, offset_y)
+        self.move(offset_x, offset_y)
 
     def rotate(self, center, angle):
         """ Rotate this point around centerpoint at angle
@@ -62,7 +62,7 @@ class Point:
         if isinstance(angle, int):
             angle = math.radians(angle)
         radius = self.distance(center)
-        complementer_angle = (self.y - center.y) / radius
+        complementer_angle = math.asin((self.y - center.y) / radius)
         distance = 2 * radius * math.tan(angle / 2)
         self.shift(distance, angle + complementer_angle)
 
