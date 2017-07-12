@@ -64,8 +64,8 @@ class Point:
         # translate point to origin (0, 0)
         self.move(-center.x, -center.y)
         # rotate point
-        x = self.__x * math.cos(angle) - self.__y * math.sin(angle);
-        y = self.__x * math.sin(angle) + self.__y * math.cos(angle);
+        x = self.__x * math.cos(angle) - self.__y * math.sin(angle)
+        y = self.__x * math.sin(angle) + self.__y * math.cos(angle)
         # translate point back
         self.__x = x + center.x
         self.__y = y + center.y
