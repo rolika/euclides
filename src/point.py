@@ -16,7 +16,7 @@ class Point:
 
     def __str__(self):
         """ String representation of a point: (x,y) """
-        return "({},{})".format(self.__x, self.__y)
+        return "({:.2f},{:.2f})".format(self.__x, self.__y)
 
     @property
     def x(self):
@@ -61,10 +61,14 @@ class Point:
         If angle is float, threat it as radians, if integer, as degrees """
         if isinstance(angle, int):
             angle = math.radians(angle)
-        radius = self.distance(center)
-        complementer_angle = math.asin((self.y - center.y) / radius)
-        distance = 2 * radius * math.tan(angle / 2)
-        self.shift(distance, angle + complementer_angle)
+        # translate point to origin (0, 0)
+        self.move(-center.x, -center.y)
+        # rotate point
+        x = self.__x * math.cos(angle) - self.__y * math.sin(angle);
+        y = self.__x * math.sin(angle) + self.__y * math.cos(angle);
+        # translate point back
+        self.__x = x + center.x
+        self.__y = y + center.y
 
 
 def test():
@@ -81,6 +85,8 @@ def test():
     print(p)
     p.shift(math.sqrt(2), 45)
     print(p)
+    q.move(0, -10)
+    print(q)
     q.rotate(o, 90)
     print(q)
 
