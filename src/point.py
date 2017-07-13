@@ -38,6 +38,11 @@ class Point:
         """ Set the y coordinate in pixels """
         self.__y = y
 
+    @classmethod
+    def next(cls, x, y):
+        """ Create a new instance with these coordinates """
+        return cls(x, y)
+
     def distance(self, other):
         """ Return the distance between this and other point """
         return math.sqrt((self.__x - other.x)**2 + (self.__y - other.y)**2)
@@ -73,7 +78,7 @@ class Point:
 
 def test():
     """ Testing this class """
-    o = Point(0, 0)
+    o = Point()
     p = Point(2, 2)
     print(p)
     p.x = 3
