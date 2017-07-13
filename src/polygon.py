@@ -23,7 +23,7 @@ class Polygon:
         center = "The polygon's center is at {}.\n".format(self.__center)
         coords = ", ".join([str(p) for p in self.__corners])
         coord = "Its coordinates are: {}.".format(coords)
-        return center + coords
+        return center + coord
 
     def __setup(self, n):
         """ Set up the polygon. 
