@@ -25,6 +25,14 @@ class Polygon:
         coord = "Its coordinates are: {}.".format(coords)
         return center + coord
 
+    def create(self, canvas):
+        """ Create a tkinter-polygon using the coordinates """
+        self.__poly = canvas.create_polygon(*self.__coords, fill="", outline="white")
+
+    def draw(self, canvas):
+        """ Draw this polygon on the canvas """
+        canvas.coords(self.__poly, *self.__coords)
+
     def __setup(self, n):
         """ Set up the polygon. 
             Begin with its center point, then the top corner and proceed clockwise.
@@ -41,6 +49,7 @@ class Polygon:
             self.__corners.append(p.next(p.x, p.y))
             p.shift(edge, angle)
             angle += half * 2
+        self.__coords = [(corner.x, corner.y) for corner in self.__corners]
 
 
 def test():
