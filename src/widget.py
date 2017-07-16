@@ -5,11 +5,7 @@ A geometric shooter
 
 import tkinter as tk
 from tkinter import ttk
-
-WIDTH = 640
-HEIGHT = 480
-BG_COLOR = "black"
-FG_COLOR = "white"
+import const
 
 
 class GameField(tk.Canvas):
@@ -18,9 +14,9 @@ class GameField(tk.Canvas):
     def __init__(self, root=None):
         """ Init game field """
         super().__init__(root)
-        self["height"] = HEIGHT
-        self["width"] = WIDTH
-        self["bg"] = BG_COLOR
+        self["height"] = const.GAME_HEIGHT
+        self["width"] = const.GAME_WIDTH
+        self["bg"] = const.BG_COLOR
         self.grid()
 
     def add_poly(self, polygon):
@@ -28,7 +24,7 @@ class GameField(tk.Canvas):
             polygon: a Polygon-object
         """
         polygon.tkid = self.create_polygon(
-            polygon.coords(), fill="", outline=FG_COLOR)
+            polygon.coords(), fill="", outline=const.FG_COLOR)
 
     def move_poly(self, polygon, x, y):
         """ Relocate polygon on the canvas.
@@ -44,7 +40,7 @@ def test():
     """ Testing this class """
     import polygon
     g = GameField()
-    p = polygon.Polygon(50, 7)
+    p = polygon.Polygon(20, 3)
     p.move(320, 200)
     g.add_poly(p)
     g.bind("<Motion>", lambda event: g.move_poly(p, event.x, event.y))
