@@ -94,6 +94,7 @@ def test():
     print(q)
     q.rotate(o, 90)
     print(q)
+    print(p.x, p.y)
 
 
 if __name__ == "__main__":

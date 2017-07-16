@@ -4,6 +4,7 @@ A geometric shooter
 """
 
 import math
+import itertools
 import point
 
 
@@ -15,46 +16,69 @@ class Polygon:
             radius: radius of its outer circle
             n: will be an n-sided polygon
         """
-        self.__radius = radius
-        self.__setup(n)
+        self.__tkid = None
+        self.__setup(radius, n)
 
     def __str__(self):
-        """ List the poligons tipical points (center and corners) """
+        """ List the polygons typical points (center and corners) """
         center = "The polygon's center is at {}.\n".format(self.__center)
         coords = ", ".join([str(p) for p in self.__corners])
         coord = "Its coordinates are: {}.".format(coords)
         return center + coord
 
-    def create(self, canvas):
-        """ Create a tkinter-polygon using the coordinates """
-        self.__poly = canvas.create_polygon(*self.__coords, fill="", outline="white")
+    @property
+    def tkid(self):
+        """ Return this polygon's tkinter object id """
+        return self.__tkid
 
-    def draw(self, canvas):
-        """ Draw this polygon on the canvas """
-        canvas.coords(self.__poly, *self.__coords)
+    @tkid.setter
+    def tkid(self, tkid):
+        """ Set this polygons tkinter object id """
+        self.__tkid = tkid
 
-    def __setup(self, n):
+    def coords(self):
+        """ Return the polygon's coordinates as a tuple
+            Tkinter needs this format in .coords() """
+        coord = [(corner.x, corner.y) for corner in self.__corners]
+        return tuple(itertools.chain.from_iterable(coord))
+
+    def move(self, x, y):
+        """ Set this polygon's center points and corners as well.
+            x: new horizontal coordinate of polygons center point
+            y: new vertical coordinate of polygons center point
+        """
+        offset_x = x - self.__center.x
+        offset_y = y - self.__center.y
+        self.__center.move(offset_x, offset_y)
+        for corner in self.__corners:
+            corner.move(offset_x, offset_y)
+
+    def __setup(self, radius, n):
         """ Set up the polygon. 
             Begin with its center point, then the top corner and proceed clockwise.
+            radius: radius of 
             n: n-sided polygon
         """
         p = point.Point()  # working variable
-        self.__center = p.next(p.x, p.y)  # looks better than point.Point(p.x, p.y)
+        # looks better than point.Point(p.x, p.y)
+        self.__center = p.next(p.x, p.y)
         self.__corners = []
         half = math.pi / n  # half of the interior angle (in radians: 2pi/n/2)
-        edge = 2 * self.__radius * math.sin(half)
+        edge = 2 * radius * math.sin(half)
         angle = half  # starting angle
-        p.move(0, -self.__radius)  # move point to the top
+        p.move(0, -radius)  # move point to the top
         for i in range(n):
             self.__corners.append(p.next(p.x, p.y))
             p.shift(edge, angle)
             angle += half * 2
-        self.__coords = [(corner.x, corner.y) for corner in self.__corners]
 
 
 def test():
     """ Testing this class """
     p = Polygon(5, 7)
+    print(p)
+    print(p.coords())
+    p.move(2, 2)
     print(p)
 
 
