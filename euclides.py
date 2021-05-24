@@ -3,24 +3,30 @@ from pygame import sprite
 from pygame.locals import *
 import math
 import sys
+import enum
 
 
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
 PLAYER_SIZE = 60
 PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
+PLAYER_PROJECTILE_SPEED = (0, -1)  # player projectiles move only upwards
 
 
 class Polygon(sprite.Sprite):
     """Draw a regular polygon inside a sprite."""
-    def __init__(self, size, n) -> None:
+    def __init__(self, size, n, width=None) -> None:
         """Prepare a surface containing the polygon.
         size:   size of containing surface (rectangular area as the polygon is regular)
-        n:      this will be an n-sided polygon"""
+        n:      number of vertices
+        width:  width of constructing lines"""
         super().__init__()
         self.image = pygame.Surface((size, size))
-        pygame.draw.polygon(self.image, pygame.Color("white"), self._vertices(size, n), n)
+        if not width:
+            width = n
+        pygame.draw.polygon(self.image, pygame.Color("white"), self._vertices(size, n), width)
         self.rect = self.image.get_rect()
+        self._n = n
 
     def _vertices(self, size, n):
         """Calculate the vertices of the polygon.
@@ -60,6 +66,24 @@ class Player(Polygon):
         self._keep_on_screen(*pygame.mouse.get_pos())
 
 
+class Projectile(Polygon):
+    """The player, as well as enemies can shoot projectiles."""
+    def __init__(self, owner: Polygon) -> None:
+        """The projectile needs to know who fired it off."""
+        super().__init__(owner.rect.width // 4, owner._n, 1)
+        if self._n == PLAYER_VERTICES:
+            self.image = pygame.transform.rotate(self.image, 180)  # turn upside down to look like a projectile
+        self._speed = PLAYER_PROJECTILE_SPEED
+        self.rect.center = owner.rect.center
+    
+    def update(self):
+        self.rect.centerx += self._speed[0]
+        self.rect.centery += self._speed[1]
+        if self.rect.bottom < 0:
+            self.kill()
+        
+
+
 class Euclides:
     """Main game application."""
     def __init__(self) -> None:
@@ -70,9 +94,9 @@ class Euclides:
 
     def _main(self) -> None:
         """Execute the application."""
-        player = Player()
+        self._player = Player()
         pygame.mouse.set_pos(PLAYER_START_POSITION)
-        sprites = sprite.RenderPlain((player, ))
+        self._sprites = sprite.RenderPlain((self._player, ))
 
         while 1:
             self._screen.fill((0, 0, 0))
@@ -82,11 +106,21 @@ class Euclides:
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
                         self._exit()
+                if event.type == MOUSEBUTTONDOWN:
+                    self._open_fire()
+                if event.type == MOUSEBUTTONUP:
+                    self._cease_fire()
                 # if event.type == MOUSEMOTION:
                 #     print(player._is_on_screen())
-            sprites.update()
-            sprites.draw(self._screen)
+            self._sprites.update()
+            self._sprites.draw(self._screen)
             pygame.display.update()
+    
+    def _open_fire(self):
+        self._sprites.add(Projectile(self._player))
+    
+    def _cease_fire(self):
+        pass
     
     def _exit(self):
         pygame.quit()
