@@ -21,12 +21,12 @@ class Polygon(sprite.Sprite):
         n:      number of vertices
         width:  width of constructing lines"""
         super().__init__()
-        self.radius = size // 2
+        self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
         self.image = pygame.Surface((size, size))
         if not width:
             width = n
-        pygame.draw.polygon(self.image, pygame.Color("white"), self._vertices(), width)
+        pygame.draw.polygon(self.image, pygame.Color("white"), self._vertices(), 1)
          # turn upside down to look like a starship or its projectile (enemies and their bullets don't really matter)
         self.image = pygame.transform.rotate(self.image, 180)
         self.rect = self.image.get_rect()
@@ -40,7 +40,8 @@ class Polygon(sprite.Sprite):
         Returns:    a list of pair of coordinates"""
         angle = math.radians(360 / self.n)  # inner angle of polygon
         # 'radius +' means here that origin is in the rect's middle
-        return [[int(self.radius + self.radius*math.sin(i*angle)), int(self.radius + self.radius*math.cos(i*angle))] for i in range(0, self.n)]
+        return [[int(self.radius + self.radius*math.sin(i*angle)), int(self.radius + self.radius*math.cos(i*angle))]\
+            for i in range(0, self.n)]
 
 
 class Player(Polygon):
@@ -137,8 +138,9 @@ class Euclides:
             player_sprite.update()
             player_sprite.draw(self._screen)
 
-            self._projectile_sprites.update()
-            self._projectile_sprites.draw(self._screen)
+            if self._projectile_sprites:
+                self._projectile_sprites.update()
+                self._projectile_sprites.draw(self._screen)
 
             if enemy_sprites:
                 if sprite.spritecollide(enemy, self._projectile_sprites, True, sprite.collide_circle):
@@ -146,8 +148,9 @@ class Euclides:
                 enemy_sprites.update()
                 enemy_sprites.draw(self._screen)
 
-            bullet_sprites.update()
-            bullet_sprites.draw(self._screen)
+            if bullet_sprites:
+                bullet_sprites.update()
+                bullet_sprites.draw(self._screen)
 
             pygame.display.flip()
 
