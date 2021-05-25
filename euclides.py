@@ -106,10 +106,7 @@ class Enemy(Polygon):
         super().__init__(size, n, hull=n)
 
     def update(self) -> None:
-        if self.is_destroyed:
-            self.kill()
-        else:
-            self.rect.center = (400, 100)
+        self.rect.center = (400, 100)
 
 
 class HullDamage(sprite.Group):
