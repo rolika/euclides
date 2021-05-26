@@ -121,10 +121,9 @@ class Wave(sprite.Group):
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
 
-    def handle(self, *args, **kwargs) -> None:
-        """Overriding default update to handle hull damage."""
-        screen = kwargs.pop("screen", None)
-        assert screen  # screen must be provided
+    def handle(self, screen: pygame.Surface) -> None:
+        """Handle sprites within the group.
+        screen: game's display Surface"""
         for poly in self.sprites():
             if poly.is_destroyed:
                 poly.kill()  # remove from group
@@ -133,46 +132,56 @@ class Wave(sprite.Group):
         super().draw(screen)
 
 
+class Bullet(sprite.Group):
+    """Custom sprite.Group to handle friendly and hostile bullets and update them."""
+    def __init__(self, **sprites: Polygon) -> None:
+        """Uses default initialization.
+        sprites:    any number of sprite objects"""
+        super().__init__(*sprites)
+    
+    def handle(self, hostile: Wave, screen: pygame.Surface):
+        """Check interaction with enemy wave.
+        Remove bullets if they hit their enemy and reduce their hull.
+        hostile:   other wave"""
+        for enemy in sprite.groupcollide(hostile, self, False, True, sprite.collide_circle):
+            enemy.reduce_hull()
+        super().update()
+        super().draw(screen)
+
 class Euclides:
     """Main game application."""
     def __init__(self) -> None:
+        # initialize game objects
         pygame.init()
         pygame.display.set_caption("Euclides")
-        self._screen = pygame.display.set_mode(SCREEN_SIZE)
         self._main()
 
     def _main(self) -> None:
         """Execute the application."""
-        self._player = Player(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION, PLAYER_SIZE)
+        screen = pygame.display.set_mode(SCREEN_SIZE)
+        player = Player(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION, PLAYER_SIZE)
         pygame.mouse.set_pos(PLAYER_START_POSITION)
-        player = Wave((self._player, ))
-        self._projectiles = Wave()
+        friendly = Wave((player, ))
+        friendly_fire = Bullet()
         enemy = Enemy(80, 8)
-        enemies = Wave((enemy, ))
+        hostile = Wave((enemy, ))
 
-        while self._player.alive():
-            self._screen.fill((0, 0, 0))
+        while player.alive():
+            screen.fill((0, 0, 0))
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
                     self._exit()
                 if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:
+                    if event.key == K_ESCAPE:  # exit by pressing escape
                         self._exit()
-                if event.type == MOUSEBUTTONDOWN:
-                    self._open_fire()
+                if event.type == MOUSEBUTTONDOWN:                    
+                    friendly_fire.add(Projectile(player))
 
-            player.handle(screen=self._screen)
-
-            for enemy_ in sprite.groupcollide(enemies, self._projectiles, False, True, sprite.collide_circle):
-                enemy_.reduce_hull()
-            self._projectiles.handle(screen=self._screen)
-            enemies.handle(screen=self._screen)
+            friendly_fire.handle(hostile, screen)
+            friendly.handle(screen)
+            hostile.handle(screen)
 
             pygame.display.flip()
-
-    def _open_fire(self) -> None:
-        """Player shoots a projectile."""
-        self._projectiles.add(Projectile(self._player))
 
     def _exit(self) -> None:
         """Nicely exit the game."""
