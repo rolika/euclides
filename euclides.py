@@ -56,10 +56,15 @@ class Polygon(sprite.Sprite):
 
 class Player(Polygon):
     """Player is a regular triangle."""
-    def __init__(self) -> None:
-        """Initialize a triangle, representing a starfighter."""
-        super().__init__(PLAYER_SIZE, PLAYER_VERTICES, hull=PLAYER_SIZE)
-        self.rect.center = PLAYER_START_POSITION
+    def __init__(self, size: int, n: int, pos: tuple, hull: int) -> None:
+        """Initialize a triangle, representing a starfighter.
+        size:   size of containing surface (rectangular area as the polygon is regular)
+        n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper
+        hull:   the polygon in the game can take this damage before destroying; projectiles take only one damage.
+                Generally, polygons can take as much damage as their number of vertices."""
+        super().__init__(size, n, hull)
+        self.rect.center = pos
 
     def update(self) -> None:
         """Update the player sprite."""
@@ -138,7 +143,7 @@ class Euclides:
 
     def _main(self) -> None:
         """Execute the application."""
-        self._player = Player()
+        self._player = Player(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION, PLAYER_SIZE)
         pygame.mouse.set_pos(PLAYER_START_POSITION)
         player = Wave((self._player, ))
         self._projectiles = Wave()
