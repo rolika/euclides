@@ -131,22 +131,25 @@ class Wave(sprite.Group):
         super().update()
         super().draw(screen)
 
-
-class Bullet(sprite.Group):
-    """Custom sprite.Group to handle friendly and hostile bullets and update them."""
-    def __init__(self, **sprites: Polygon) -> None:
-        """Uses default initialization.
-        sprites:    any number of sprite objects"""
-        super().__init__(*sprites)
+    def hit(self, hostile: sprite.Group) -> None:
+        """Check if a projectile hits a hostile target.
+        This should be called on projectile instance, as they'll be destoryed on collision.
+        hostile:    wave of target sprite(s), precisely player or enemy"""
+        for member in sprite.groupcollide(hostile, self, False, True, sprite.collide_circle):
+            member.reduce_hull()
     
-    def handle(self, hostile: Wave, screen: pygame.Surface):
-        """Check interaction with enemy wave.
-        Remove bullets if they hit their enemy and reduce their hull.
-        hostile:   other wave"""
-        for enemy in sprite.groupcollide(hostile, self, False, True, sprite.collide_circle):
+    def bounce(self, hostile: sprite.Group) -> None:
+        """Check if player and enemy objects collide, reduce their hull and bounce them off of each other.
+        This should be called on player instance, as they'll be bounced off.
+        hostile:    wave of target sprite(s), precisely player or enemy"""
+        for enemy, friendly in sprite.groupcollide(hostile, self, False, False, sprite.collide_circle).items():
             enemy.reduce_hull()
-        super().update()
-        super().draw(screen)
+            for player in friendly:
+                player.reduce_hull()
+                dx = (enemy.rect.centerx - player.rect.centerx)/2 * -1
+                dy = (enemy.rect.centery - player.rect.centery)/2 * -1
+                pygame.mouse.set_pos(player.rect.centerx + dx, player.rect.centery + dy)
+
 
 class Euclides:
     """Main game application."""
@@ -162,7 +165,7 @@ class Euclides:
         player = Player(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION, PLAYER_SIZE)
         pygame.mouse.set_pos(PLAYER_START_POSITION)
         friendly = Wave((player, ))
-        friendly_fire = Bullet()
+        friendly_fire = Wave()
         enemy = Enemy(80, 8)
         hostile = Wave((enemy, ))
 
@@ -172,12 +175,17 @@ class Euclides:
                 if event.type == QUIT:  # exit by closing the window
                     self._exit()
                 if event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:  # exit by pressing escape
+                    if event.key == K_ESCAPE:  # exit by pressing escape button
                         self._exit()
-                if event.type == MOUSEBUTTONDOWN:                    
+                if event.type == MOUSEBUTTONDOWN:  # open fire
                     friendly_fire.add(Projectile(player))
 
-            friendly_fire.handle(hostile, screen)
+            # check collisions with hostile objects
+            friendly_fire.hit(hostile)
+            friendly.bounce(hostile)
+
+            # update sprites
+            friendly_fire.handle(screen)
             friendly.handle(screen)
             hostile.handle(screen)
 
