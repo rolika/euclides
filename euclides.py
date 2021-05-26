@@ -56,7 +56,7 @@ class Polygon(sprite.Sprite):
 
 class Player(Polygon):
     """Player is a regular triangle."""
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize a triangle, representing a starfighter."""
         super().__init__(PLAYER_SIZE, PLAYER_VERTICES, hull=PLAYER_SIZE)
         self.rect.center = PLAYER_START_POSITION
@@ -67,8 +67,8 @@ class Player(Polygon):
 
     def _keep_on_screen(self, x: int, y: int) -> None:
         """Always keep the whole player polygon on screen.
-        x:  intended next horizontal coordinate
-        y:  intended next vertical coordinate"""
+        x:  intended next horizontal center coordinate
+        y:  intended next vertical center coordinate"""
         frame_left = frame_top = self.rect.width // 2
         frame_right = SCREEN_WIDTH - frame_left
         frame_bottom = SCREEN_HEIGHT - frame_top
@@ -95,35 +95,35 @@ class Projectile(Polygon):
     def update(self):
         self.rect.centerx += self._speed[0]
         self.rect.centery += self._speed[1]
-        if self.rect.bottom < 0:  # kill projectile if it leaves the screen
+        if self.rect.bottom < 0:  # remove from group if it leaves the screen
             self.kill()
 
 
 class Enemy(Polygon):
     """Enemies are rectangles, pentagons, hexagons etc."""
     def __init__(self, size: int, n: int) -> None:
-        """Initialize an enemy, a size-ed, n-sided polygon."""
+        """Initialize an enemy, a size-ed, n-sided, n-hulled spaceship."""
         super().__init__(size, n, hull=n)
 
     def update(self) -> None:
         self.rect.center = (400, 100)
 
 
-class HullDamage(sprite.Group):
-    """Custom sprite.Group to handle hull damage."""
+class Wave(sprite.Group):
+    """Custom sprite.Group to check on hull damage and convinient sprite update."""
     def __init__(self, *sprites: Polygon) -> None:
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
 
-    def update(self, *args, **kwargs) -> None:
+    def handle(self, *args, **kwargs) -> None:
         """Overriding default update to handle hull damage."""
         screen = kwargs.pop("screen", None)
-        assert screen
+        assert screen  # screen must be provided
         for poly in self.sprites():
             if poly.is_destroyed:
-                poly.kill()
-                self.clear(poly.image, screen)
+                poly.kill()  # remove from group
+                self.clear(poly.image, screen)  # overwrite with background
         super().update()
         super().draw(screen)
 
@@ -140,10 +140,10 @@ class Euclides:
         """Execute the application."""
         self._player = Player()
         pygame.mouse.set_pos(PLAYER_START_POSITION)
-        player = HullDamage((self._player, ))
-        self._projectiles = HullDamage()
+        player = Wave((self._player, ))
+        self._projectiles = Wave()
         enemy = Enemy(80, 8)
-        enemies = HullDamage((enemy, ))
+        enemies = Wave((enemy, ))
 
         while self._player.alive():
             self._screen.fill((0, 0, 0))
@@ -156,19 +156,21 @@ class Euclides:
                 if event.type == MOUSEBUTTONDOWN:
                     self._open_fire()
 
-            player.update(screen=self._screen)
+            player.handle(screen=self._screen)
 
             for enemy_ in sprite.groupcollide(enemies, self._projectiles, False, True, sprite.collide_circle):
                 enemy_.reduce_hull()
-            self._projectiles.update(screen=self._screen)
-            enemies.update(screen=self._screen)
+            self._projectiles.handle(screen=self._screen)
+            enemies.handle(screen=self._screen)
 
             pygame.display.flip()
 
-    def _open_fire(self):
+    def _open_fire(self) -> None:
+        """Player shoots a projectile."""
         self._projectiles.add(Projectile(self._player))
 
-    def _exit(self):
+    def _exit(self) -> None:
+        """Nicely exit the game."""
         pygame.quit()
         sys.exit()
 
