@@ -14,10 +14,11 @@ PLAYER_PROJECTILE_SPEED = (0, -2)  # player projectiles move only upwards
 
 class Polygon(sprite.Sprite):
     """All game objects in Euclides are regular polygons."""
-    def __init__(self, size: int, n: int, hull: int=1) -> None:
+    def __init__(self, size: int, n: int, pos:tuple, hull: int=1) -> None:
         """Prepare a sprite containing the polygon.
         size:   size of containing surface (rectangular area as the polygon is regular)
         n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)
         hull:   the polygon in the game can take this damage before destroying; projectiles take only one damage.
                 Generally, polygons can take as much damage as their number of vertices."""
         super().__init__()
@@ -30,6 +31,7 @@ class Polygon(sprite.Sprite):
          # this doesn't really matter in case of enemies and their bullets
         self.image = pygame.transform.rotate(self.image, 180)
         self.rect = self.image.get_rect()
+        self.rect.center = pos
 
     @property
     def n(self) -> int:
@@ -56,15 +58,11 @@ class Polygon(sprite.Sprite):
 
 class Player(Polygon):
     """Player is a regular triangle."""
-    def __init__(self, size: int, n: int, pos: tuple, hull: int) -> None:
+    def __init__(self, size: int, n: int, pos: tuple) -> None:
         """Initialize a triangle, representing a starfighter.
         size:   size of containing surface (rectangular area as the polygon is regular)
-        n:      number of vertices
-        pos:    tuple of x, y coordinates, where the polygon should apper
-        hull:   the polygon in the game can take this damage before destroying; projectiles take only one damage.
-                Generally, polygons can take as much damage as their number of vertices."""
-        super().__init__(size, n, hull)
-        self.rect.center = pos
+        n:      number of vertices"""
+        super().__init__(size, n, pos, n)
 
     def update(self) -> None:
         """Update the player sprite."""
@@ -89,13 +87,12 @@ class Player(Polygon):
 
 
 class Projectile(Polygon):
-    """The player shoots triangle shaped projectiles."""
-    def __init__(self, player: Polygon) -> None:
+    """The polygon shoots same shaped projectiles."""
+    def __init__(self, owner: Polygon) -> None:
         """The projectile needs to know who fired it off, to get its size and shape.
-        player: Player sprite"""
-        super().__init__(player.rect.width // 4, player.n, 1)
+        owner: player on enemy sprite"""
+        super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
         self._speed = PLAYER_PROJECTILE_SPEED
-        self.rect.midbottom = player.rect.midtop  # projectile is fired off from tip of the triangle
 
     def update(self):
         self.rect.centerx += self._speed[0]
@@ -106,9 +103,9 @@ class Projectile(Polygon):
 
 class Enemy(Polygon):
     """Enemies are rectangles, pentagons, hexagons etc."""
-    def __init__(self, size: int, n: int) -> None:
+    def __init__(self, size: int, n: int, pos: tuple) -> None:
         """Initialize an enemy, a size-ed, n-sided, n-hulled spaceship."""
-        super().__init__(size, n, hull=n)
+        super().__init__(size, n, pos, hull=n)
 
     def update(self) -> None:
         self.rect.center = (400, 100)
@@ -124,10 +121,10 @@ class Wave(sprite.Group):
     def handle(self, screen: pygame.Surface) -> None:
         """Handle sprites within the group.
         screen: game's display Surface"""
-        for poly in self.sprites():
-            if poly.is_destroyed:
-                poly.kill()  # remove from group
-                self.clear(poly.image, screen)  # overwrite with background
+        for member in self.sprites():
+            if member.is_destroyed:
+                member.kill()  # remove from group
+                self.clear(member.image, screen)  # overwrite with background
         super().update()
         super().draw(screen)
 
@@ -162,11 +159,11 @@ class Euclides:
     def _main(self) -> None:
         """Execute the application."""
         screen = pygame.display.set_mode(SCREEN_SIZE)
-        player = Player(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION, PLAYER_SIZE)
+        player = Player(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
         pygame.mouse.set_pos(PLAYER_START_POSITION)
         friendly = Wave((player, ))
         friendly_fire = Wave()
-        enemy = Enemy(80, 8)
+        enemy = Enemy(80, 8, (400, 100))
         hostile = Wave((enemy, ))
 
         while player.alive():
