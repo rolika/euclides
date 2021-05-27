@@ -11,6 +11,7 @@ PLAYER_SIZE = 60
 PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
 PLAYER_PROJECTILE_SPEED = (0, -2)  # player projectiles move only upwards
+PI = math.pi
 
 
 class Polygon(sprite.Sprite):
@@ -195,7 +196,7 @@ class Euclides:
         pygame.mouse.set_pos(PLAYER_START_POSITION)
         friendly = Wave((player, ))
         friendly_fire = Wave()
-        enemy = Enemy(80, 8, (400, 100), 5, math.pi/4)
+        enemy = Enemy(80, 8, (400, 100), 8, PI/4)
         hostile = Wave((enemy, ))
 
         while player.alive():
@@ -207,7 +208,7 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         self._exit()
                 if event.type == MOUSEBUTTONDOWN:  # open fire
-                    friendly_fire.add(Projectile(player, 10, math.pi*1.5))
+                    friendly_fire.add(Projectile(player, 10, PI*1.5))
 
             # check collisions with hostile objects
             friendly_fire.hit(hostile)
