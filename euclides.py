@@ -23,7 +23,7 @@ class Polygon(sprite.Sprite):
         pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)
         hull:           the polygon in the game can take this damage before destroying; projectiles take only one
                         Generally, polygons can take as much damage as their number of vertices.
-        displacement:   displacemnet in pixel
+        displacement:   displacement in pixel
         angle:          shooting angle in radians"""
         super().__init__()
         self.radius = size // 2 # used by sprite.collide_circle as well
@@ -62,7 +62,7 @@ class Polygon(sprite.Sprite):
     
     def _calculate_speed(self, displacement:int, angle:float) -> tuple:
         """Calculate speed as dx and dy coordinates.
-        displacement:   displacemnet in pixel
+        displacement:   displacement in pixel
         angle:          shooting angle in radians"""
         return displacement*math.cos(angle), displacement*math.sin(angle)
 
@@ -102,7 +102,7 @@ class Projectile(Polygon):
     def __init__(self, owner:Polygon, displacement:int, angle:float) -> None:
         """The projectile needs to know who fired it off, to get its size and shape.
         owner:          player on enemy sprite
-        displacement:   displacemnet in pixel
+        displacement:   displacement in pixel
         angle:          shooting angle in radians"""
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center, 1, displacement, angle)
 
@@ -121,7 +121,7 @@ class Enemy(Polygon):
         size:           size of containing surface (rectangular area as the polygon is regular)
         n:              number of vertices
         pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)
-        displacement:   displacemnet in pixel
+        displacement:   displacement in pixel
         angle:          shooting angle in radians"""
         super().__init__(size, n, pos, hull=n, displacement=displacement, angle=angle)
 
@@ -196,7 +196,7 @@ class Euclides:
         pygame.mouse.set_pos(PLAYER_START_POSITION)
         friendly = Wave((player, ))
         friendly_fire = Wave()
-        enemy = Enemy(80, 8, (400, 100), 8, PI/4)
+        enemy = Enemy(80, 8, (400, 100), 8, PI/8)
         hostile = Wave((enemy, ))
 
         while player.alive():
@@ -208,7 +208,7 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         self._exit()
                 if event.type == MOUSEBUTTONDOWN:  # open fire
-                    friendly_fire.add(Projectile(player, 10, PI*1.5))
+                    friendly_fire.add(Projectile(player, 15, PI*1.5))
 
             # check collisions with hostile objects
             friendly_fire.hit(hostile)
