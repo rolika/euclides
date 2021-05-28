@@ -1,6 +1,6 @@
 import pygame
 from pygame import sprite
-from pygame.time import Clock
+from pygame import time
 from pygame.locals import *
 import math
 import sys
@@ -11,7 +11,9 @@ PLAYER_SIZE = 60
 PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
 PLAYER_PROJECTILE_SPEED = (0, -2)  # player projectiles move only upwards
+INVULNERABILTY_COOLDOWN = 500  # after hit, player or enemy is invulnerable for a while (milliseconds)
 PI = math.pi
+START_TIME = time.get_ticks()
 
 
 class Polygon(sprite.Sprite):
@@ -37,6 +39,7 @@ class Polygon(sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = pos
         self._dx, self._dy = self._calculate_speed(displacement, angle)
+        self._last_hit = START_TIME
 
     @property
     def n(self) -> int:
@@ -50,7 +53,13 @@ class Polygon(sprite.Sprite):
 
     def reduce_hull(self) -> None:
         """Reduce the game object's hull by one."""
-        self._hull -= 1
+        now = time.get_ticks()
+        if now - self._last_hit >= INVULNERABILTY_COOLDOWN:
+            self._hull -= 1
+    
+    def set_last_hit(self):
+        """Set timestamp of last hit."""
+        self._last_hit = time.get_ticks()
 
     def _vertices(self):
         """Calculate the vertices of the polygon.
@@ -77,7 +86,7 @@ class Player(Polygon):
 
     def update(self) -> None:
         """Update the player sprite."""
-        self._keep_on_screen(*pygame.mouse.get_pos())
+        self._keep_on_screen(*pygame.mouse.get_pos())        
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -162,7 +171,8 @@ class Wave(sprite.Group):
         super().draw(screen)
     
     def contact(self, hostile: sprite.Group):
-        """Detect collision betwwen two group of sprites and reduce their hull.
+        """Detect collision between player and enemy polygons and reduce their hull.
+        This method should be called on the player instance with the enemy wave as argument and vice versa.
         hostile:    wave of enemy sprites"""
         detected = set()
         for player, enemies in sprite.groupcollide(hostile, self, False, False, sprite.collide_circle).items():
@@ -170,7 +180,14 @@ class Wave(sprite.Group):
             detected.add(*enemies)
         for member in detected:
             member.reduce_hull()
-
+            member.set_last_hit()
+    
+    def hit(self, projectiles: sprite.Group) -> None:
+        """Detect collision between projectiles and their target.
+        This method should be called on player or enemy instances with projectiles as argument.
+        projectile: wave of projectiles"""
+        for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
+            member.reduce_hull()
 
 class Euclides:
     """Main game application."""
@@ -186,8 +203,10 @@ class Euclides:
         player = Player(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
         pygame.mouse.set_pos(PLAYER_START_POSITION)
         friendly = Wave((player, ))
+        friendly_fire = Wave()
         enemy = Enemy(80, 8, (400, 100), 8, PI/8)
         hostile = Wave((enemy, ))
+        hostile_fire = Wave()
 
         while player.alive():
             screen.fill((0, 0, 0))
@@ -198,17 +217,21 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         self._exit()
                 if event.type == MOUSEBUTTONDOWN:  # open fire
-                    friendly.add(Projectile(player, 15, PI*1.5))
+                    friendly_fire.add(Projectile(player, 15, PI*1.5))
 
             # check collisions with hostile objects
-            friendly.contact(hostile)
+            hostile.hit(friendly_fire)
+            friendly.hit(hostile_fire)
+            friendly.contact(hostile)  # both player and enemy get invulnerable for a while after collision
 
             # update sprites
             friendly.handle(screen)
+            friendly_fire.handle(screen)
             hostile.handle(screen)
+            hostile_fire.handle(screen)
 
             pygame.display.flip()
-            Clock().tick(10)
+            time.Clock().tick(10)
 
     def _exit(self) -> None:
         """Nicely exit the game."""
