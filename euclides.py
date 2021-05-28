@@ -56,7 +56,7 @@ class Polygon(sprite.Sprite):
         now = time.get_ticks()
         if now - self._last_hit >= INVULNERABILTY_COOLDOWN:
             self._hull -= 1
-    
+
     def set_last_hit(self):
         """Set timestamp of last hit."""
         self._last_hit = time.get_ticks()
@@ -68,7 +68,7 @@ class Polygon(sprite.Sprite):
         # 'radius +' means here that origin is in the rect's middle
         return [[int(self.radius + self.radius*math.sin(i*angle)), int(self.radius + self.radius*math.cos(i*angle))]\
             for i in range(0, self.n)]
-    
+
     def _calculate_speed(self, displacement:int, angle:float) -> tuple:
         """Calculate speed as dx and dy coordinates.
         displacement:   displacement in pixel
@@ -86,7 +86,7 @@ class Player(Polygon):
 
     def update(self) -> None:
         """Update the player sprite."""
-        self._keep_on_screen(*pygame.mouse.get_pos())        
+        self._keep_on_screen(*pygame.mouse.get_pos())
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -119,7 +119,9 @@ class Projectile(Polygon):
         """Update the projectile sprite."""
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
-        if self.rect.bottom < 0:  # remove from group if it leaves the screen
+        # remove from group if it leaves the screen
+        if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
+            self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
             self.kill()
 
 
@@ -169,7 +171,7 @@ class Wave(sprite.Group):
                 self.clear(member.image, screen)  # overwrite with background
         super().update()
         super().draw(screen)
-    
+
     def contact(self, hostile: sprite.Group):
         """Detect collision between player and enemy polygons and reduce their hull.
         This method should be called on the player instance with the enemy wave as argument and vice versa.
@@ -181,13 +183,14 @@ class Wave(sprite.Group):
         for member in detected:
             member.reduce_hull()
             member.set_last_hit()
-    
+
     def hit(self, projectiles: sprite.Group) -> None:
         """Detect collision between projectiles and their target.
         This method should be called on player or enemy instances with projectiles as argument.
         projectile: wave of projectiles"""
         for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
             member.reduce_hull()
+
 
 class Euclides:
     """Main game application."""
@@ -231,7 +234,7 @@ class Euclides:
             hostile_fire.handle(screen)
 
             pygame.display.flip()
-            time.Clock().tick(10)
+            time.Clock().tick(60)
 
     def _exit(self) -> None:
         """Nicely exit the game."""
