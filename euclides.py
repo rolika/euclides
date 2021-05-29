@@ -188,6 +188,8 @@ class Wave(sprite.Group):
         """Handle sprites within the group.
         screen: game's display Surface"""
         for member in self.sprites():
+            # getattr is needed, because Projectile doesn't have the is_destroyed() method.
+            # I can't figure it out why adding this method to Projectile always returning False doesn't work.
             if getattr(member, "is_destroyed", None) and member.is_destroyed:  # guardian pattern
                 member.kill()  # remove from group
                 self.clear(member.image, screen)  # overwrite with background
@@ -243,7 +245,7 @@ class Euclides:
                         self._exit()
                 if event.type == MOUSEBUTTONDOWN:  # open fire
                     friendly_fire.add(Projectile(player, 15, PI*1.5))
-            
+
             # check whether player's projectile hits an enemy
             hostile.hit_by(friendly_fire)
 
@@ -253,7 +255,6 @@ class Euclides:
             # update sprites
             friendly.handle(screen)
             friendly_fire.handle(screen)
-            #friendly_fire.update()
             hostile.handle(screen)
 
             pygame.display.flip()
