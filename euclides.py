@@ -99,6 +99,14 @@ class Enemy(Spaceship):
         """Reduce enemy hull by 1."""
         self._hull -= 1
 
+    def turn_dx(self) -> None:
+        """Turn around horizontal movement."""
+        self._dx *= -1
+
+    def turn_dy(self) -> None:
+        """Turn around vertical movement."""
+        self._dy *= -1
+
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges.
         x:  intended next horizontal center coordinate
@@ -107,9 +115,9 @@ class Enemy(Spaceship):
         frame_right = SCREEN_WIDTH - frame_left
         frame_bottom = SCREEN_HEIGHT - frame_top
         if x < frame_left or x > frame_right:
-            self._dx *= -1
+            self.turn_dx()
         if y < frame_top or y > frame_bottom:
-            self._dy *= -1
+            self.turn_dy()
 
 
 class Player(Spaceship):
@@ -132,23 +140,28 @@ class Player(Spaceship):
     def set_last_hit(self) -> None:
         """Set timestamp of last hit."""
         self._last_hit = time.get_ticks()
-    
+
     def knockback(self, enemy:Enemy):
-        """Enemies shouldn't overlap the player sprite, because their hull gets too fast exhausted from collision.
+        """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
         This method knocks back the enemy sprite avoiding overlapping.
         enemy: Enemy sprite"""
-        if self.rect.bottom < enemy.rect.top:
-            overlap = enemy.rect.top - self.rect.bottom
-            enemy.rect.top += overlap
-        if self.rect.top > enemy.rect.bottom:
-            overlap = self.rect.top - enemy.rect.bottom
+        if self.rect.top < enemy.rect.bottom:  # player is below
+            overlap = enemy.rect.bottom - self.rect.top
             enemy.rect.bottom -= overlap
-        if self.rect.left < enemy.rect.right:
+            enemy.turn_dy()
+        if self.rect.left < enemy.rect.right:  # player is on right
             overlap = enemy.rect.right - self.rect.left
             enemy.rect.right -= overlap
-        if self.rect.right > enemy.rect.left:
+            enemy.turn_dx()
+        if self.rect.bottom > enemy.rect.top:  # player is above
+            overlap = self.rect.bottom - enemy.rect.top
+            enemy.rect.top += overlap
+            enemy.turn_dy()
+        if self.rect.right > enemy.rect.left:  # player is on left
             overlap = self.rect.right - enemy.rect.left
             enemy.rect.left += overlap
+            enemy.turn_dx()
+
 
     def _is_vulnerable(self) -> bool:
         """Check player's vulnerability."""
