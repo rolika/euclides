@@ -77,51 +77,6 @@ class Spaceship(Polygon):
         return self._hull < 1
 
 
-class Player(Spaceship):
-    """Player is represented by a regular triangle-shaped spaceship."""
-    def __init__(self) -> None:
-        """Initialize a triangle, representing the player."""
-        super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
-        # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
-        self._last_hit = START_TIME
-
-    def update(self) -> None:
-        """Update the player sprite. The ship is controlled by mouse movement by its center point."""
-        self._keep_on_screen(*pygame.mouse.get_pos())
-
-    def damage(self) -> None:
-        """Reduce player's hull by one, if it isn't invulnerable."""
-        if self._is_vulnerable():
-            self._hull -= 1
-
-    def set_last_hit(self) -> None:
-        """Set timestamp of last hit."""
-        self._last_hit = time.get_ticks()
-
-    def _is_vulnerable(self) -> bool:
-        """Check player's vulnerability."""
-        now = time.get_ticks()
-        time_since_last_hit = now - self._last_hit
-        return time_since_last_hit >= INVULNERABILTY_COOLDOWN
-
-    def _keep_on_screen(self, x:int, y:int) -> None:
-        """Always keep the whole player polygon on screen.
-        x:  intended next horizontal center coordinate
-        y:  intended next vertical center coordinate"""
-        frame_left = frame_top = self.rect.width // 2
-        frame_right = SCREEN_WIDTH - frame_left
-        frame_bottom = SCREEN_HEIGHT - frame_top
-        if x < frame_left:
-            x = frame_left
-        if x > frame_right:
-            x = frame_right
-        if y < frame_top:
-            y = frame_top
-        if y > frame_bottom:
-            y = frame_bottom
-        self.rect.center = (x, y)
-
-
 class Enemy(Spaceship):
     """Enemies are regular polygons above triangles: rectangles, pentagons, hexagons etc."""
     def __init__(self, size:int, n:int, pos:tuple, displacement:int, angle:float) -> None:
@@ -157,6 +112,68 @@ class Enemy(Spaceship):
             self._dy *= -1
 
 
+class Player(Spaceship):
+    """Player is represented by a regular triangle-shaped spaceship."""
+    def __init__(self) -> None:
+        """Initialize a triangle, representing the player."""
+        super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
+        # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
+        self._last_hit = START_TIME
+
+    def update(self) -> None:
+        """Update the player sprite. The ship is controlled by mouse movement by its center point."""
+        self._keep_on_screen(*pygame.mouse.get_pos())
+
+    def damage(self) -> None:
+        """Reduce player's hull by one, if it isn't invulnerable."""
+        if self._is_vulnerable():
+            self._hull -= 1
+
+    def set_last_hit(self) -> None:
+        """Set timestamp of last hit."""
+        self._last_hit = time.get_ticks()
+    
+    def knockback(self, enemy:Enemy):
+        """Enemies shouldn't overlap the player sprite, because their hull gets too fast exhausted from collision.
+        This method knocks back the enemy sprite avoiding overlapping.
+        enemy: Enemy sprite"""
+        if self.rect.bottom < enemy.rect.top:
+            overlap = enemy.rect.top - self.rect.bottom
+            enemy.rect.top += overlap
+        if self.rect.top > enemy.rect.bottom:
+            overlap = self.rect.top - enemy.rect.bottom
+            enemy.rect.bottom -= overlap
+        if self.rect.left < enemy.rect.right:
+            overlap = enemy.rect.right - self.rect.left
+            enemy.rect.right -= overlap
+        if self.rect.right > enemy.rect.left:
+            overlap = self.rect.right - enemy.rect.left
+            enemy.rect.left += overlap
+
+    def _is_vulnerable(self) -> bool:
+        """Check player's vulnerability."""
+        now = time.get_ticks()
+        time_since_last_hit = now - self._last_hit
+        return time_since_last_hit >= INVULNERABILTY_COOLDOWN
+
+    def _keep_on_screen(self, x:int, y:int) -> None:
+        """Always keep the whole player polygon on screen.
+        x:  intended next horizontal center coordinate
+        y:  intended next vertical center coordinate"""
+        frame_left = frame_top = self.rect.width // 2
+        frame_right = SCREEN_WIDTH - frame_left
+        frame_bottom = SCREEN_HEIGHT - frame_top
+        if x < frame_left:
+            x = frame_left
+        if x > frame_right:
+            x = frame_right
+        if y < frame_top:
+            y = frame_top
+        if y > frame_bottom:
+            y = frame_bottom
+        self.rect.center = (x, y)
+
+
 class Projectile(Polygon):
     """The polygon shoots same shaped projectiles."""
     def __init__(self, owner:Polygon, displacement:int, angle:float) -> None:
@@ -189,8 +206,7 @@ class Wave(sprite.Group):
         screen: game's display Surface"""
         for member in self.sprites():
             # getattr is needed, because Projectile doesn't have the is_destroyed() method.
-            # I can't figure it out why adding this method to Projectile always returning False doesn't work.
-            if getattr(member, "is_destroyed", None) and member.is_destroyed:  # guardian pattern
+            if getattr(member, "is_destroyed", None):
                 member.kill()  # remove from group
                 self.clear(member.image, screen)  # overwrite with background
         self.draw(screen)
@@ -202,7 +218,8 @@ class Wave(sprite.Group):
         hostile:    wave of enemy sprites"""
         detected = set()
         for player, enemies in sprite.groupcollide(self, hostile, False, False, sprite.collide_circle).items():
-            player.set_last_hit()
+            for enemy in enemies:
+                player.knockback(enemy)
             detected.add(player)
             detected.add(*enemies)
         for member in detected:
@@ -249,7 +266,7 @@ class Euclides:
             # check whether player's projectile hits an enemy
             hostile.hit_by(friendly_fire)
 
-            # check player collisions with enemy objects
+            # check player collisions with enemy craft
             friendly.contact(hostile)  # player gets invulnerable for a while after collision
 
             # update sprites
