@@ -17,8 +17,8 @@ PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
 INVULNERABILTY_COOLDOWN = 500  # after hit, player or enemy is invulnerable for a while (milliseconds)
 
-ENEMY_STARTING_SIZE = 40
-ENEMY_SIZE_INCREMENT = 10
+ENEMY_STARTING_SIZE = 100
+ENEMY_SIZE_INCREMENT = -10
 ENEMY_STARTING_SPEED = 3
 ENEMY_SPEED_INCREMENT = 1
 ENEMY_STARTING_VERTICES = 4
@@ -60,6 +60,7 @@ class Polygon(sprite.Sprite):
          # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
          # this doesn't really matter in case of enemies and their bullets
         self.image = pygame.transform.rotate(self.image, 180)
+        self.image.set_colorkey(self.image.get_at((0, 0)))
         self.rect = self.image.get_rect()
         self.rect.center = pos
 
@@ -111,11 +112,11 @@ class Enemy(Spaceship):
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
-        self._dx *= -1
+        self._dx = -self._dx
 
     def turn_dy(self) -> None:
         """Turn around vertical movement."""
-        self._dy *= -1
+        self._dy = -self._dy
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges.
