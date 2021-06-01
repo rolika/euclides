@@ -133,6 +133,15 @@ class Player(Spaceship):
         super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
         # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
         self._last_hit = START_TIME
+        self._fires = False  # player fires continously
+    
+    @property
+    def fires(self) -> bool:
+        return self._fires
+    
+    @fires.setter
+    def fires(self, state) -> None:
+        self._fires = state
 
     def update(self) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
@@ -286,7 +295,12 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         self._exit()
                 if event.type == MOUSEBUTTONDOWN:  # open fire
-                    friendly_fire.add(Projectile(player, 15, PI*1.5))
+                    player.fires = True
+                if event.type == MOUSEBUTTONUP:  # cease fire
+                    player.fires = False
+            
+            if player.fires:
+                friendly_fire.add(Projectile(player, 15, PI*1.5))
 
             # spawn new enemy wave when the former is destroyed
             if not bool(hostile):
