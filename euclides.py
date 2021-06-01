@@ -41,7 +41,7 @@ class Trig:
         """Calculate delta x and delta y offset coordinates.
         displacement:   displacement in pixel
         angle:          angle in radians"""
-        return displacement*math.cos(angle), displacement*math.sin(angle)
+        return math.ceil(displacement*math.cos(angle)), math.ceil(displacement*math.sin(angle))
 
 
 class Polygon(sprite.Sprite):
@@ -102,7 +102,7 @@ class Enemy(Spaceship):
 
     def update(self) -> None:
         """Update the enemy sprite."""
-        self._keep_on_screen(*self.rect.center)
+        self._keep_on_screen()
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
 
@@ -118,16 +118,11 @@ class Enemy(Spaceship):
         """Turn around vertical movement."""
         self._dy = -self._dy
 
-    def _keep_on_screen(self, x:int, y:int) -> None:
-        """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges.
-        x:  intended next horizontal center coordinate
-        y:  intended next vertical center coordinate"""
-        frame_left = frame_top = self.rect.width // 2
-        frame_right = SCREEN_WIDTH - frame_left
-        frame_bottom = SCREEN_HEIGHT - frame_top
-        if x < frame_left or x > frame_right:
+    def _keep_on_screen(self) -> None:
+        """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
+        if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
             self.turn_dx()
-        if y < frame_top or y > frame_bottom:
+        if self.rect.top < 0 or self.rect.bottom > SCREEN_HEIGHT:
             self.turn_dy()
 
 
