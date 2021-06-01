@@ -15,12 +15,12 @@ SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
-INVULNERABILTY_COOLDOWN = 500  # after hit, player or enemy is invulnerable for a while (milliseconds)
+WEAPON_COOLDOWN = 60  # player can fire at this rate (milliseconds)
 
 ENEMY_STARTING_SIZE = 100
-ENEMY_SIZE_INCREMENT = -10
+ENEMY_SIZE_INCREMENT = -5
 ENEMY_STARTING_SPEED = 3
-ENEMY_SPEED_INCREMENT = 1
+ENEMY_SPEED_INCREMENT = 0.5
 ENEMY_STARTING_VERTICES = 4
 ENEMY_PROJECTILE_STARTING_SPEED = 2
 ENEMY_PROJECTILE_SPEED_INCREMENT = 1
@@ -132,7 +132,7 @@ class Player(Spaceship):
         """Initialize a triangle, representing the player."""
         super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
         # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
-        self._last_hit = START_TIME
+        self._last_fire = START_TIME
         self._fires = False  # player fires continously
     
     @property
@@ -149,12 +149,11 @@ class Player(Spaceship):
 
     def damage(self) -> None:
         """Reduce player's hull by one, if it isn't invulnerable."""
-        if self._is_vulnerable():
-            self._hull -= 1
+        self._hull -= 1
 
-    def set_last_hit(self) -> None:
+    def set_last_fire(self) -> None:
         """Set timestamp of last hit."""
-        self._last_hit = time.get_ticks()
+        self._last_fire = time.get_ticks()
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
@@ -177,11 +176,11 @@ class Player(Spaceship):
             enemy.rect.left += overlap
             enemy.turn_dx()
 
-    def _is_vulnerable(self) -> bool:
-        """Check player's vulnerability."""
+    def is_ready_to_fire(self) -> bool:
+        """Check player's ability to fire."""
         now = time.get_ticks()
-        time_since_last_hit = now - self._last_hit
-        return time_since_last_hit >= INVULNERABILTY_COOLDOWN
+        time_since_last_fire = now - self._last_fire
+        return time_since_last_fire >= WEAPON_COOLDOWN
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -299,8 +298,9 @@ class Euclides:
                 if event.type == MOUSEBUTTONUP:  # cease fire
                     player.fires = False
             
-            if player.fires:
+            if player.is_ready_to_fire() and player.fires:
                 friendly_fire.add(Projectile(player, 15, PI*1.5))
+                player.set_last_fire()
 
             # spawn new enemy wave when the former is destroyed
             if not bool(hostile):
