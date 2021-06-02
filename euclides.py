@@ -4,20 +4,30 @@ from pygame import time
 from pygame.locals import *
 import math
 import sys
+import random
 
 
-SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
-PLAYER_SIZE = 60
-PLAYER_VERTICES = 3  # a triangle
-PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
-PLAYER_PROJECTILE_SPEED = (0, -2)  # player projectiles move only upwards
-INVULNERABILTY_COOLDOWN = 500  # after hit, player or enemy is invulnerable for a while (milliseconds)
 PI = math.pi
 START_TIME = time.get_ticks()
 
+SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
+
+PLAYER_SIZE = 40
+PLAYER_VERTICES = 3  # a triangle
+PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
+WEAPON_COOLDOWN = 60  # player can fire at this rate (milliseconds)
+
+ENEMY_STARTING_SIZE = 100
+ENEMY_SIZE_INCREMENT = -5
+ENEMY_STARTING_SPEED = 3
+ENEMY_SPEED_INCREMENT = 0.5
+ENEMY_STARTING_VERTICES = 4
+ENEMY_PROJECTILE_STARTING_SPEED = 2
+ENEMY_PROJECTILE_SPEED_INCREMENT = 1
+
 
 class Trig:
-    """Separate trigonometrics."""
+    """Collection of trigonometric methods."""
 
     def vertices(n, r) -> list:
         """Calculate the vertices of the polygon.
@@ -31,7 +41,7 @@ class Trig:
         """Calculate delta x and delta y offset coordinates.
         displacement:   displacement in pixel
         angle:          angle in radians"""
-        return displacement*math.cos(angle), displacement*math.sin(angle)
+        return math.ceil(displacement*math.cos(angle)), math.ceil(displacement*math.sin(angle))
 
 
 class Polygon(sprite.Sprite):
@@ -50,6 +60,7 @@ class Polygon(sprite.Sprite):
          # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
          # this doesn't really matter in case of enemies and their bullets
         self.image = pygame.transform.rotate(self.image, 180)
+        self.image.set_colorkey(self.image.get_at((0, 0)))
         self.rect = self.image.get_rect()
         self.rect.center = pos
 
@@ -91,9 +102,9 @@ class Enemy(Spaceship):
 
     def update(self) -> None:
         """Update the enemy sprite."""
+        self._keep_on_screen()
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
-        self._keep_on_screen(*self.rect.center)
 
     def damage(self) -> None:
         """Reduce enemy hull by 1."""
@@ -101,22 +112,17 @@ class Enemy(Spaceship):
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
-        self._dx *= -1
+        self._dx = -self._dx
 
     def turn_dy(self) -> None:
         """Turn around vertical movement."""
-        self._dy *= -1
+        self._dy = -self._dy
 
-    def _keep_on_screen(self, x:int, y:int) -> None:
-        """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges.
-        x:  intended next horizontal center coordinate
-        y:  intended next vertical center coordinate"""
-        frame_left = frame_top = self.rect.width // 2
-        frame_right = SCREEN_WIDTH - frame_left
-        frame_bottom = SCREEN_HEIGHT - frame_top
-        if x < frame_left or x > frame_right:
+    def _keep_on_screen(self) -> None:
+        """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
+        if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
             self.turn_dx()
-        if y < frame_top or y > frame_bottom:
+        if self.rect.top < 0 or self.rect.bottom > SCREEN_HEIGHT:
             self.turn_dy()
 
 
@@ -126,7 +132,16 @@ class Player(Spaceship):
         """Initialize a triangle, representing the player."""
         super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
         # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
-        self._last_hit = START_TIME
+        self._last_fire = START_TIME
+        self._fires = False  # player fires continously
+    
+    @property
+    def fires(self) -> bool:
+        return self._fires
+    
+    @fires.setter
+    def fires(self, state) -> None:
+        self._fires = state
 
     def update(self) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
@@ -134,12 +149,11 @@ class Player(Spaceship):
 
     def damage(self) -> None:
         """Reduce player's hull by one, if it isn't invulnerable."""
-        if self._is_vulnerable():
-            self._hull -= 1
+        self._hull -= 1
 
-    def set_last_hit(self) -> None:
+    def set_last_fire(self) -> None:
         """Set timestamp of last hit."""
-        self._last_hit = time.get_ticks()
+        self._last_fire = time.get_ticks()
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
@@ -162,12 +176,11 @@ class Player(Spaceship):
             enemy.rect.left += overlap
             enemy.turn_dx()
 
-
-    def _is_vulnerable(self) -> bool:
-        """Check player's vulnerability."""
+    def is_ready_to_fire(self) -> bool:
+        """Check player's ability to fire."""
         now = time.get_ticks()
-        time_since_last_hit = now - self._last_hit
-        return time_since_last_hit >= INVULNERABILTY_COOLDOWN
+        time_since_last_fire = now - self._last_fire
+        return time_since_last_fire >= WEAPON_COOLDOWN
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -229,13 +242,13 @@ class Wave(sprite.Group):
         """Detect collision between player and enemy polygons and reduce their hull.
         This method should be called on the player instance with the enemy wave as argument.
         hostile:    wave of enemy sprites"""
-        detected = set()
+        detected = sprite.Group()
         for player, enemies in sprite.groupcollide(self, hostile, False, False, sprite.collide_circle).items():
             for enemy in enemies:
                 player.knockback(enemy)
             detected.add(player)
             detected.add(*enemies)
-        for member in detected:
+        for member in detected.sprites():
             member.damage()
 
     def hit_by(self, projectiles: sprite.Group) -> None:
@@ -251,6 +264,7 @@ class Euclides:
     """Main game application."""
     def __init__(self) -> None:
         # initialize game objects
+        random.seed()
         pygame.init()
         pygame.display.set_caption("Euclides")
         self._main()
@@ -262,9 +276,15 @@ class Euclides:
         pygame.mouse.set_pos(PLAYER_START_POSITION)
         friendly = Wave((player, ))
         friendly_fire = Wave()
-        enemy = Enemy(80, 8, (400, 100), 8, PI/8)
-        hostile = Wave((enemy, ))
+        hostile = Wave()
 
+        # setup first enemy wave
+        size = ENEMY_STARTING_SIZE
+        n = 4  # enemy wave (number of enemies & numebr of vertices)
+        speed = ENEMY_STARTING_SPEED
+        self._spawn_enemy_wave(hostile, size, n, speed)
+
+        # main game loop
         while player.alive():
             screen.fill((0, 0, 0))
             for event in pygame.event.get():
@@ -274,7 +294,20 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         self._exit()
                 if event.type == MOUSEBUTTONDOWN:  # open fire
-                    friendly_fire.add(Projectile(player, 15, PI*1.5))
+                    player.fires = True
+                if event.type == MOUSEBUTTONUP:  # cease fire
+                    player.fires = False
+            
+            if player.is_ready_to_fire() and player.fires:
+                friendly_fire.add(Projectile(player, 15, PI*1.5))
+                player.set_last_fire()
+
+            # spawn new enemy wave when the former is destroyed
+            if not bool(hostile):
+                size += ENEMY_SIZE_INCREMENT
+                n += 1
+                speed += ENEMY_SPEED_INCREMENT
+                self._spawn_enemy_wave(hostile, size, n, speed)
 
             # check whether player's projectile hits an enemy
             hostile.hit_by(friendly_fire)
@@ -289,6 +322,18 @@ class Euclides:
 
             pygame.display.flip()
             time.Clock().tick(60)
+
+    def _spawn_enemy_wave(self, wave:Wave, size: int, n:int, speed:int):
+        """Spawn a new enemy wave.
+        wave:   sprite container for enemies
+        size:   enemy size in pixels
+        n:      number of vertices
+        speed:  displacement in pixels"""
+        for i in range(n):
+            x = random.randrange(0, SCREEN_WIDTH, 1)
+            y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
+            angle = math.radians(random.randrange(15, 345, 1))
+            wave.add(Enemy(size, n, (x, y), speed, angle))
 
     def _exit(self) -> None:
         """Nicely exit the game."""
