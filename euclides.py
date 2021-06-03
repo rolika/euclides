@@ -120,9 +120,17 @@ class Enemy(Spaceship):
 
     def _keep_on_screen(self) -> None:
         """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
-        if self.rect.left < 0 or self.rect.right > SCREEN_WIDTH:
+        if self.rect.left < 0:
+            self.rect.left = 0
             self.turn_dx()
-        if self.rect.top < 0 or self.rect.bottom > SCREEN_HEIGHT:
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH - 1
+            self.turn_dx()
+        if self.rect.top < 0: 
+            self.rect.top = 0
+            self.turn_dy()
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT - 1
             self.turn_dy()
 
 
