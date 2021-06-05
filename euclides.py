@@ -15,6 +15,7 @@ SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
+PLAYER_PROJECTILE_SPEED = 15
 WEAPON_COOLDOWN = 60  # player can fire at this rate (milliseconds)
 
 ENEMY_STARTING_SIZE = 100
@@ -210,13 +211,13 @@ class Player(Spaceship):
 
 class Projectile(Polygon):
     """The polygon shoots same shaped projectiles."""
-    def __init__(self, owner:Polygon, displacement:int, angle:float) -> None:
+    def __init__(self, owner:Polygon, speed:int, angle:float) -> None:
         """The projectile needs to know who fired it off, to get its size and shape.
-        owner:          player on enemy sprite
-        displacement:   displacement in pixel
-        angle:          shooting angle in radians"""
+        owner:  player on enemy sprite
+        speed:  displacement in pixel
+        angle:  shooting angle in radians"""
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
-        self._dx, self._dy = Trig.offset(displacement, angle)  # projectiles move right away after spawning
+        self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
 
     def update(self) -> None:
         """Update the projectile sprite."""
@@ -307,7 +308,7 @@ class Euclides:
                     player.fires = False
             
             if player.is_ready_to_fire() and player.fires:
-                friendly_fire.add(Projectile(player, 15, PI*1.5))
+                friendly_fire.add(Projectile(player, PLAYER_PROJECTILE_SPEED, PI*1.5))
                 player.set_last_fire()
 
             # spawn new enemy wave when the former is destroyed
