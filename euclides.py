@@ -1,6 +1,7 @@
 import pygame
 from pygame import sprite
 from pygame import time
+from pygame import font
 from pygame.locals import *
 import math
 import sys
@@ -11,6 +12,9 @@ PI = math.pi
 START_TIME = time.get_ticks()
 
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
+
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
 
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
@@ -25,6 +29,9 @@ ENEMY_SPEED_INCREMENT = 0.5
 ENEMY_STARTING_VERTICES = 4
 ENEMY_PROJECTILE_STARTING_SPEED = 2
 ENEMY_PROJECTILE_SPEED_INCREMENT = 1
+
+SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
+SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
 
 
 class Trig:
@@ -57,7 +64,7 @@ class Polygon(sprite.Sprite):
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
         self.image = pygame.Surface((size, size))
-        pygame.draw.polygon(self.image, pygame.Color("white"), Trig.vertices(n, self.radius), 1)
+        pygame.draw.polygon(self.image, WHITE, Trig.vertices(n, self.radius), 1)
          # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
          # this doesn't really matter in case of enemies and their bullets
         self.image = pygame.transform.rotate(self.image, 180)
@@ -83,6 +90,10 @@ class Spaceship(Polygon):
         super().__init__(size, n, pos)
         self._hull = n
 
+    def damage(self) -> None:
+        """Reduce hull by one."""
+        self._hull -= 1
+
     @property
     def is_destroyed(self) -> bool:
         """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
@@ -106,10 +117,6 @@ class Enemy(Spaceship):
         self._keep_on_screen()
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
-
-    def damage(self) -> None:
-        """Reduce enemy hull by 1."""
-        self._hull -= 1
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
@@ -155,10 +162,6 @@ class Player(Spaceship):
     def update(self) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
         self._keep_on_screen(*pygame.mouse.get_pos())
-
-    def damage(self) -> None:
-        """Reduce player's hull by one, if it isn't invulnerable."""
-        self._hull -= 1
 
     def set_last_fire(self) -> None:
         """Set timestamp of last hit."""
@@ -235,6 +238,12 @@ class Wave(sprite.Group):
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
+        self._score = 0
+
+    @property
+    def score(self) -> int:
+        """For simplicity, score is calculated for each wave, but only that of enemies will be used."""
+        return self._score
 
     def handle(self, screen:pygame.Surface) -> None:
         """Handle sprites within the group.
@@ -242,6 +251,7 @@ class Wave(sprite.Group):
         for member in self.sprites():
             # getattr is needed, because Projectile doesn't have the is_destroyed() method.
             if getattr(member, "is_destroyed", None):
+                self._score += SCORE_DESTROY_ENEMY * member.n
                 member.kill()  # remove from group
                 self.clear(member.image, screen)  # overwrite with background
         self.draw(screen)
@@ -261,12 +271,13 @@ class Wave(sprite.Group):
             member.damage()
 
     def hit_by(self, projectiles: sprite.Group) -> None:
-        """Detect collision between projectiles and their target.
-        This method should be called on player or enemy instances with projectiles as argument.
+        """Detect collision between projectiles and their spaceship target.
+        This method should be called on the enemy instance with projectiles as argument.
         Colliding projectiles get killed off (dokill2=True).
         projectile: wave of projectiles"""
         for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
             member.damage()
+            self._score += SCORE_HULL_DAMAGE * member.n
 
 
 class Euclides:
@@ -283,6 +294,9 @@ class Euclides:
 
         # setup display
         screen = pygame.display.set_mode(SCREEN_SIZE)
+
+        # setup fonts
+        score_font = font.Font("font/Monofett-Regular.ttf", 40)
 
         # setup player
         player = Player()
@@ -303,7 +317,7 @@ class Euclides:
         while player.alive():
 
             time.Clock().tick(60)
-            screen.fill((0, 0, 0))
+            screen.fill(BLACK)
 
             # listen for user actions
             for event in pygame.event.get():
@@ -334,6 +348,9 @@ class Euclides:
             # check player collisions with enemy craft
             friendly.contact(hostile)  # player gets invulnerable for a while after collision
 
+            # show score
+            self._show_text(screen, (10, 10), score_font, "score: {:07}".format(hostile.score))
+
             # update sprites
             friendly.handle(screen)
             friendly_fire.handle(screen)
@@ -352,6 +369,11 @@ class Euclides:
             y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
             angle = math.radians(random.randrange(315, 345, 1))
             wave.add(Enemy(size, n, (x, y), speed, angle))
+    
+    def _show_text(self, screen:pygame.Surface, pos:tuple, font:font.Font, text:str) -> None:
+        """Show textual information on game screen."""
+        text_render = font.render(text, True, WHITE)
+        screen.blit(text_render, pos)
 
     def _exit(self) -> None:
         """Nicely exit the game."""
