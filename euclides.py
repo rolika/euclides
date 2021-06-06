@@ -15,7 +15,8 @@ SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
-WEAPON_COOLDOWN = 60  # player can fire at this rate (milliseconds)
+PLAYER_PROJECTILE_SPEED = 15
+WEAPON_COOLDOWN = 50  # player can fire at this rate (milliseconds)
 
 ENEMY_STARTING_SIZE = 100
 ENEMY_SIZE_INCREMENT = -5
@@ -126,7 +127,7 @@ class Enemy(Spaceship):
         if self.rect.right > SCREEN_WIDTH:
             self.rect.right = SCREEN_WIDTH - 1
             self.turn_dx()
-        if self.rect.top < 0: 
+        if self.rect.top < 0:
             self.rect.top = 0
             self.turn_dy()
         if self.rect.bottom > SCREEN_HEIGHT:
@@ -142,11 +143,11 @@ class Player(Spaceship):
         # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
         self._last_fire = START_TIME
         self._fires = False  # player fires continously
-    
+
     @property
     def fires(self) -> bool:
         return self._fires
-    
+
     @fires.setter
     def fires(self, state) -> None:
         self._fires = state
@@ -210,13 +211,13 @@ class Player(Spaceship):
 
 class Projectile(Polygon):
     """The polygon shoots same shaped projectiles."""
-    def __init__(self, owner:Polygon, displacement:int, angle:float) -> None:
+    def __init__(self, owner:Polygon, speed:int, angle:float) -> None:
         """The projectile needs to know who fired it off, to get its size and shape.
-        owner:          player on enemy sprite
-        displacement:   displacement in pixel
-        angle:          shooting angle in radians"""
+        owner:  player on enemy sprite
+        speed:  displacement in pixel
+        angle:  shooting angle in radians"""
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
-        self._dx, self._dy = Trig.offset(displacement, angle)  # projectiles move right away after spawning
+        self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
 
     def update(self) -> None:
         """Update the projectile sprite."""
@@ -279,9 +280,15 @@ class Euclides:
 
     def _main(self) -> None:
         """Execute the application."""
+
+        # setup display
         screen = pygame.display.set_mode(SCREEN_SIZE)
+
+        # setup player
         player = Player()
         pygame.mouse.set_pos(PLAYER_START_POSITION)
+
+        # setup sprite groups
         friendly = Wave((player, ))
         friendly_fire = Wave()
         hostile = Wave()
@@ -294,7 +301,11 @@ class Euclides:
 
         # main game loop
         while player.alive():
+
+            time.Clock().tick(60)
             screen.fill((0, 0, 0))
+
+            # listen for user actions
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
                     self._exit()
@@ -305,9 +316,10 @@ class Euclides:
                     player.fires = True
                 if event.type == MOUSEBUTTONUP:  # cease fire
                     player.fires = False
-            
+
+            # shoot player projectiles
             if player.is_ready_to_fire() and player.fires:
-                friendly_fire.add(Projectile(player, 15, PI*1.5))
+                friendly_fire.add(Projectile(player, PLAYER_PROJECTILE_SPEED, PI*1.5))
                 player.set_last_fire()
 
             # spawn new enemy wave when the former is destroyed
@@ -319,7 +331,6 @@ class Euclides:
 
             # check whether player's projectile hits an enemy
             hostile.hit_by(friendly_fire)
-
             # check player collisions with enemy craft
             friendly.contact(hostile)  # player gets invulnerable for a while after collision
 
@@ -329,9 +340,8 @@ class Euclides:
             hostile.handle(screen)
 
             pygame.display.flip()
-            time.Clock().tick(60)
 
-    def _spawn_enemy_wave(self, wave:Wave, size: int, n:int, speed:int):
+    def _spawn_enemy_wave(self, wave:Wave, size: int, n:int, speed:int) -> None:
         """Spawn a new enemy wave.
         wave:   sprite container for enemies
         size:   enemy size in pixels
@@ -340,7 +350,7 @@ class Euclides:
         for i in range(n):
             x = random.randrange(0, SCREEN_WIDTH, 1)
             y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
-            angle = math.radians(random.randrange(15, 345, 1))
+            angle = math.radians(random.randrange(315, 345, 1))
             wave.add(Enemy(size, n, (x, y), speed, angle))
 
     def _exit(self) -> None:
