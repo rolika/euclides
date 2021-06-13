@@ -6,6 +6,7 @@ from pygame.locals import *
 import math
 import sys
 import random
+import shelve
 
 
 PI = math.pi
@@ -289,6 +290,10 @@ class Euclides:
         random.seed()
         pygame.init()
         pygame.display.set_caption("Euclides")
+
+        with shelve.open("hiscore") as hsc:
+            self._hiscore = hsc.get("hiscore", 0)
+
         self._main()
 
     def _main(self) -> None:
@@ -324,10 +329,10 @@ class Euclides:
             # listen for user actions
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
-                    self._exit()
+                    self._exit(hostile.score)
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
-                        self._exit()
+                        self._exit(hostile.score)
                 if event.type == MOUSEBUTTONDOWN:  # open fire
                     player.fires = True
                 if event.type == MOUSEBUTTONUP:  # cease fire
@@ -353,12 +358,18 @@ class Euclides:
             # show score
             self._show_text(screen, (10, 10), score_font, "score: {:07}".format(hostile.score))
 
+            # show hi-score
+            hiscore = self._hiscore if hostile.score <= self._hiscore else hostile.score
+            self._show_text(screen, (440, 10), score_font, "hiscore: {:07}".format(hiscore))
+
             # update sprites
             friendly.handle(screen)
             friendly_fire.handle(screen)
             hostile.handle(screen)
 
             pygame.display.flip()
+
+        self._exit(hostile.score)
 
     def _spawn_enemy_wave(self, wave:Wave, size: int, n:int, speed:int) -> None:
         """Spawn a new enemy wave.
@@ -371,14 +382,21 @@ class Euclides:
             y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
             angle = math.radians(random.randrange(315, 345, 1))
             wave.add(Enemy(size, n, (x, y), speed, angle))
-    
+
     def _show_text(self, screen:pygame.Surface, pos:tuple, font:font.Font, text:str) -> None:
         """Show textual information on game screen."""
         text_render = font.render(text, True, WHITE)
         screen.blit(text_render, pos)
 
-    def _exit(self) -> None:
-        """Nicely exit the game."""
+    def _exit(self, score:int) -> None:
+        """Nicely exit the game.
+        score:  last achieved score"""
+        print("Last Euclides score:", score)
+        # save new hi-score
+        if score > self._hiscore:
+            print("It's a new hi-score!")
+            with shelve.open("hiscore") as hsc:
+                hsc["hiscore"] = score
         pygame.quit()
         sys.exit()
 
