@@ -16,6 +16,8 @@ SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = (800, 600)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
+FPS = 60
+
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
 PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
@@ -309,14 +311,14 @@ class Euclides:
 
         # setup first enemy wave
         size = ENEMY_STARTING_SIZE
-        n = 4  # enemy wave (number of enemies & numebr of vertices)
+        n = 4  # enemy wave (number of enemies & number of vertices)
         speed = ENEMY_STARTING_SPEED
         self._spawn_enemy_wave(hostile, size, n, speed)
 
         # main game loop
         while player.alive():
 
-            time.Clock().tick(60)
+            time.Clock().tick(FPS)
             screen.fill(BLACK)
 
             # listen for user actions
