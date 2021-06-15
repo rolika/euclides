@@ -174,21 +174,21 @@ class Player(Spaceship):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
         This method knocks back the enemy sprite avoiding overlapping.
         enemy: Enemy sprite"""
+        overlap = None
         if self.rect.top < enemy.rect.bottom:  # player is below
             overlap = enemy.rect.bottom - self.rect.top
-            enemy.rect.bottom -= overlap
-            enemy.turn_dy()
+            enemy.rect.bottom += overlap
         if self.rect.left < enemy.rect.right:  # player is on right
             overlap = enemy.rect.right - self.rect.left
-            enemy.rect.right -= overlap
-            enemy.turn_dx()
+            enemy.rect.right += overlap
         if self.rect.bottom > enemy.rect.top:  # player is above
             overlap = self.rect.bottom - enemy.rect.top
-            enemy.rect.top += overlap
-            enemy.turn_dy()
+            enemy.rect.top -= overlap
         if self.rect.right > enemy.rect.left:  # player is on left
             overlap = self.rect.right - enemy.rect.left
-            enemy.rect.left += overlap
+            enemy.rect.left -= overlap
+        if overlap:
+            enemy.turn_dy()
             enemy.turn_dx()
 
     def is_ready_to_fire(self) -> bool:
