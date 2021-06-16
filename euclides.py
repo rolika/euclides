@@ -201,17 +201,17 @@ class Player(Spaceship):
         """Always keep the whole player polygon on screen.
         x:  intended next horizontal center coordinate
         y:  intended next vertical center coordinate"""
-        frame_left = frame_top = self.rect.width // 2
-        frame_right = SCREEN_WIDTH - frame_left
-        frame_bottom = SCREEN_HEIGHT - frame_top
-        if x < frame_left:
-            x = frame_left
-        if x > frame_right:
-            x = frame_right
-        if y < frame_top:
-            y = frame_top
-        if y > frame_bottom:
-            y = frame_bottom
+        edge_left = edge_top = self.rect.width // 2
+        edge_right = SCREEN_WIDTH - edge_left
+        edge_bottom = SCREEN_HEIGHT - edge_top
+        if x < edge_left:
+            x = edge_left
+        if x > edge_right:
+            x = edge_right
+        if y < edge_top:
+            y = edge_top
+        if y > edge_bottom:
+            y = edge_bottom
         self.rect.center = (x, y)
 
 
