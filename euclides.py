@@ -33,6 +33,8 @@ ENEMY_STARTING_VERTICES = 4
 ENEMY_PROJECTILE_STARTING_SPEED = 2
 ENEMY_PROJECTILE_SPEED_INCREMENT = 1
 
+SCORE_COORDS = (10, 10)
+HISCORE_COORDS = (440, 10)
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
 
@@ -235,7 +237,7 @@ class Projectile(Polygon):
             self.kill()
 
 
-class Wave(sprite.Group):
+class Wave(sprite.RenderUpdates):
     """Custom sprite.Group to check on player and enemy hull damage and convinient sprite update."""
     def __init__(self, *sprites:Polygon) -> None:
         """Uses default initialization.
@@ -356,11 +358,11 @@ class Euclides:
             friendly.contact(hostile)  # player gets invulnerable for a while after collision
 
             # show score
-            self._show_text(screen, (10, 10), score_font, "score: {:07}".format(hostile.score))
+            self._show_text(screen, SCORE_COORDS, score_font, "score: {:07}".format(hostile.score))
 
             # show hi-score
             hiscore = self._hiscore if hostile.score <= self._hiscore else hostile.score
-            self._show_text(screen, (440, 10), score_font, "hiscore: {:07}".format(hiscore))
+            self._show_text(screen, HISCORE_COORDS, score_font, "hiscore: {:07}".format(hiscore))
 
             # update sprites
             friendly.handle(screen)
