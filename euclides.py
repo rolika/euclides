@@ -238,7 +238,7 @@ class Projectile(Polygon):
 
 
 class Wave(sprite.RenderUpdates):
-    """Custom sprite.Group to check on player and enemy hull damage and convinient sprite update."""
+    """Custom sprite.RenderUpdates to check on player and enemy hull damage and convinient sprite update."""
     def __init__(self, *sprites:Polygon) -> None:
         """Uses default initialization.
         sprites:    any number of sprite objects"""
@@ -247,7 +247,7 @@ class Wave(sprite.RenderUpdates):
 
     @property
     def score(self) -> int:
-        """For simplicity, score is calculated for each wave, but only that of enemies will be used."""
+        """For simplicity, score is calculated for every wave, but only that of enemies will be evaulated."""
         return self._score
 
     def handle(self, screen:pygame.Surface) -> None:
@@ -262,11 +262,11 @@ class Wave(sprite.RenderUpdates):
         self.draw(screen)
         self.update()
 
-    def contact(self, hostile: sprite.Group):
+    def contact(self, hostile:sprite.RenderUpdates):
         """Detect collision between player and enemy polygons and reduce their hull.
         This method should be called on the player instance with the enemy wave as argument.
         hostile:    wave of enemy sprites"""
-        detected = sprite.Group()
+        detected = sprite.RenderUpdates()
         for player, enemies in sprite.groupcollide(self, hostile, False, False, sprite.collide_circle).items():
             for enemy in enemies:
                 player.knockback(enemy)
@@ -275,7 +275,7 @@ class Wave(sprite.RenderUpdates):
         for member in detected.sprites():
             member.damage()
 
-    def hit_by(self, projectiles: sprite.Group) -> None:
+    def hit_by(self, projectiles:sprite.RenderUpdates) -> None:
         """Detect collision between projectiles and their spaceship target.
         This method should be called on the enemy instance with projectiles as argument.
         Colliding projectiles get killed off (dokill2=True).
