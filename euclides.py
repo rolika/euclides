@@ -340,88 +340,89 @@ class Euclides:
         pygame.init()
         pygame.display.set_caption("Euclides")
 
+        # load highscore
         with shelve.open("hiscore") as hsc:
             self._hiscore = hsc.get("hiscore", 0)
+
+        # setup display
+        self._screen = pygame.display.set_mode(SCREEN_SIZE)
+
+        # setup player
+        self._player = Player()
+        pygame.mouse.set_pos(PLAYER_START_POSITION)
+
+        # setup scores
+        self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_COORDS)
+        self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_COORDS)
+        self._score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_COORDS)
+        self._highscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_COORDS)
+        self._texts = sprite.RenderUpdates(self._title, self._subtitle, self._score, self._highscore)
+
+        # setup sprite groups
+        self._friendly = Wave((self._player, ))
+        self._friendly_fire = Wave()
+        self._hostile = Wave()
+
+        # setup first enemy wave
+        self._size = ENEMY_STARTING_SIZE
+        self._n = 4  # enemy wave (number of enemies & number of vertices)
+        self._speed = ENEMY_STARTING_SPEED
+        self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
 
         self._main()
 
     def _main(self) -> None:
         """Execute the application."""
 
-        # setup display
-        screen = pygame.display.set_mode(SCREEN_SIZE)
-
-        # setup player
-        player = Player()
-        pygame.mouse.set_pos(PLAYER_START_POSITION)
-
-        # setup scores
-        self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_COORDS)
-        self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_COORDS)
-        score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_COORDS)
-        hiscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_COORDS)
-        self._texts = sprite.RenderUpdates(self._title, self._subtitle, score, hiscore)
-
-        # setup sprite groups
-        friendly = Wave((player, ))
-        friendly_fire = Wave()
-        hostile = Wave()
-
-        # setup first enemy wave
-        size = ENEMY_STARTING_SIZE
-        n = 4  # enemy wave (number of enemies & number of vertices)
-        speed = ENEMY_STARTING_SPEED
-        self._spawn_enemy_wave(hostile, size, n, speed)
-
         # main game loop
-        while player.alive():
+        while self._player.alive():
 
             time.Clock().tick(FPS)
-            screen.fill(BLACK)
+            self._screen.fill(BLACK)
 
             # listen for user actions
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
-                    self._exit(hostile.score)
+                    self._exit(self._hostile.score)
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
-                        self._exit(hostile.score)
+                        self._exit(self._hostile.score)
                 if event.type == MOUSEBUTTONDOWN:  # open fire
-                    player.fires = True
+                    self._player.fires = True
                 if event.type == MOUSEBUTTONUP:  # cease fire
-                    player.fires = False
+                    self._player.fires = False
 
             # shoot player projectiles
-            if player.is_ready_to_fire() and player.fires:
-                friendly_fire.add(Projectile(player, PLAYER_PROJECTILE_SPEED, PI*1.5))
-                player.set_last_fire()
+            if self._player.is_ready_to_fire() and self._player.fires:
+                self._friendly_fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED, PI*1.5))
+                self._player.set_last_fire()
 
             # spawn new enemy wave when the former is destroyed
-            if not bool(hostile):
-                size += ENEMY_SIZE_INCREMENT
-                n += 1
-                speed += ENEMY_SPEED_INCREMENT
-                self._spawn_enemy_wave(hostile, size, n, speed)
+            if not bool(self._hostile):
+                self._size += ENEMY_SIZE_INCREMENT
+                self._n += 1
+                self._speed += ENEMY_SPEED_INCREMENT
+                self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
 
             # check whether player's projectile hits an enemy
-            hostile.hit_by(friendly_fire)
+            self._hostile.hit_by(self._friendly_fire)
             # check player collisions with enemy craft
-            friendly.contact(hostile)
+            self._friendly.contact(self._hostile)
 
             # update score
-            score.update("score: {:07}".format(hostile.score))
+            self._score.update("score: {:07}".format(self._hostile.score))
 
             # update hi-score
-            actual_hiscore = self._hiscore if hostile.score <= self._hiscore else hostile.score
-            hiscore.update("hiscore: {:07}".format(actual_hiscore))
+            actual_hiscore = self._hiscore if self._hostile.score <= self._hiscore else self._hostile.score
+            self._highscore.update("hiscore: {:07}".format(actual_hiscore))
 
             # update sprites
-            changed = friendly.handle(screen) + friendly_fire.handle(screen) + hostile.handle(screen)\
-                + self._texts.draw(screen)
+            changed = self._friendly.handle(self._screen) + self._friendly_fire.handle(self._screen)\
+                + self._hostile.handle(self._screen) + self._texts.draw(self._screen)
 
             pygame.display.update(changed)
 
-        self._exit(hostile.score)
+        self._exit(self._hostile.score)
     
     def _show_title(self):
         pass
