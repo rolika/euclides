@@ -7,6 +7,7 @@ import math
 import sys
 import random
 import shelve
+import enum
 
 
 PI = math.pi
@@ -33,10 +34,20 @@ ENEMY_STARTING_VERTICES = 4
 ENEMY_PROJECTILE_STARTING_SPEED = 2
 ENEMY_PROJECTILE_SPEED_INCREMENT = 1
 
-SCORE_COORDS = (10, 10)
-HISCORE_COORDS = (440, 10)
+SCORE_COORDS = (160, 10)
+HISCORE_COORDS = (610, 10)
+TITLE_COORDS = (400, 300)
+SUBTITLE_COORDS = (400, 350)
+
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
+
+
+class Status(enum.Enum):
+    """Euclides game states"""
+    QUIT = enum.auto()
+    TITLE = enum.auto()
+    GAME = enum.auto()
 
 
 class Trig:
@@ -308,7 +319,7 @@ class Text(sprite.Sprite):
     @property
     def rect(self) -> pygame.Rect:
         """Return the text's rect."""
-        return self.image.get_rect(topleft=self._pos)
+        return self.image.get_rect(center=self._pos)
 
     def update(self, text):
         """Update the text.
@@ -345,9 +356,11 @@ class Euclides:
         pygame.mouse.set_pos(PLAYER_START_POSITION)
 
         # setup scores
+        self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_COORDS)
+        self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_COORDS)
         score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_COORDS)
         hiscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_COORDS)
-        scores = sprite.RenderUpdates(score, hiscore)
+        self._texts = sprite.RenderUpdates(self._title, self._subtitle, score, hiscore)
 
         # setup sprite groups
         friendly = Wave((player, ))
@@ -404,11 +417,14 @@ class Euclides:
 
             # update sprites
             changed = friendly.handle(screen) + friendly_fire.handle(screen) + hostile.handle(screen)\
-                + scores.draw(screen)
+                + self._texts.draw(screen)
 
             pygame.display.update(changed)
 
         self._exit(hostile.score)
+    
+    def _show_title(self):
+        pass
 
     def _spawn_enemy_wave(self, wave:Wave, size: int, n:int, speed:int) -> None:
         """Spawn a new enemy wave.
