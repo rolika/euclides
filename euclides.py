@@ -169,19 +169,18 @@ class Player(Spaceship):
 
     @property
     def fires(self) -> bool:
+        """Return true if player fires, otherwise false."""
         return self._fires
 
     @fires.setter
     def fires(self, state) -> None:
+        """Set player's firing state.
+        state:  boolean value"""
         self._fires = state
 
     def update(self) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
-        self._keep_on_screen(*pygame.mouse.get_pos())
-
-    def set_last_fire(self) -> None:
-        """Set timestamp of last hit."""
-        self._last_fire = time.get_ticks()
+        self._keep_on_screen(*pygame.mouse.get_pos())        
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
@@ -209,6 +208,12 @@ class Player(Spaceship):
         now = time.get_ticks()
         time_since_last_fire = now - self._last_fire
         return time_since_last_fire >= WEAPON_COOLDOWN
+    
+    def opens(self, fire) -> None:
+        """Player opens fire.
+        fire:   sprite container for player's projectiles"""
+        fire.add(Projectile(self, PLAYER_PROJECTILE_SPEED, PI*1.5))
+        self._last_fire = time.get_ticks()
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -359,9 +364,9 @@ class Euclides:
         self._texts = sprite.RenderUpdates(self._title, self._subtitle, self._score, self._highscore)
 
         # setup sprite groups
-        self._friendly = Wave((self._player, ))
-        self._friendly_fire = Wave()
-        self._hostile = Wave()
+        self._friendly = Wave((self._player, ))  # container for friendly aircraft
+        self._fire = Wave()  # container for player's projectiles
+        self._hostile = Wave()  # container for enemy aircrafts
 
         # setup first enemy wave
         self._size = ENEMY_STARTING_SIZE
@@ -394,8 +399,7 @@ class Euclides:
 
             # shoot player projectiles
             if self._player.is_ready_to_fire() and self._player.fires:
-                self._friendly_fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED, PI*1.5))
-                self._player.set_last_fire()
+                self._player.opens(self._fire)
 
             # spawn new enemy wave when the former is destroyed
             if not bool(self._hostile):
@@ -405,7 +409,7 @@ class Euclides:
                 self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
 
             # check whether player's projectile hits an enemy
-            self._hostile.hit_by(self._friendly_fire)
+            self._hostile.hit_by(self._fire)
             # check player collisions with enemy craft
             self._friendly.contact(self._hostile)
 
@@ -417,7 +421,7 @@ class Euclides:
             self._highscore.update("hiscore: {:07}".format(actual_hiscore))
 
             # update sprites
-            changed = self._friendly.handle(self._screen) + self._friendly_fire.handle(self._screen)\
+            changed = self._friendly.handle(self._screen) + self._fire.handle(self._screen)\
                 + self._hostile.handle(self._screen) + self._texts.draw(self._screen)
 
             pygame.display.update(changed)
