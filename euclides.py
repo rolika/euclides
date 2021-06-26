@@ -33,6 +33,8 @@ ENEMY_STARTING_VERTICES = 4
 ENEMY_PROJECTILE_STARTING_SPEED = 2
 ENEMY_PROJECTILE_SPEED_INCREMENT = 1
 
+SCORE_COORDS = (10, 10)
+HISCORE_COORDS = (440, 10)
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
 
@@ -235,8 +237,8 @@ class Projectile(Polygon):
             self.kill()
 
 
-class Wave(sprite.Group):
-    """Custom sprite.Group to check on player and enemy hull damage and convinient sprite update."""
+class Wave(sprite.RenderUpdates):
+    """Custom sprite.RenderUpdates to check on player and enemy hull damage and convinient sprite update."""
     def __init__(self, *sprites:Polygon) -> None:
         """Uses default initialization.
         sprites:    any number of sprite objects"""
@@ -245,7 +247,7 @@ class Wave(sprite.Group):
 
     @property
     def score(self) -> int:
-        """For simplicity, score is calculated for each wave, but only that of enemies will be used."""
+        """For simplicity, score is calculated for every wave, but only that of enemies will be evaulated."""
         return self._score
 
     def handle(self, screen:pygame.Surface) -> None:
@@ -256,15 +258,15 @@ class Wave(sprite.Group):
             if getattr(member, "is_destroyed", None):
                 self._score += SCORE_DESTROY_ENEMY * member.n
                 member.kill()  # remove from group
-                self.clear(member.image, screen)  # overwrite with background
-        self.draw(screen)
+        changed = self.draw(screen)
         self.update()
+        return changed
 
-    def contact(self, hostile: sprite.Group):
+    def contact(self, hostile:sprite.RenderUpdates):
         """Detect collision between player and enemy polygons and reduce their hull.
         This method should be called on the player instance with the enemy wave as argument.
         hostile:    wave of enemy sprites"""
-        detected = sprite.Group()
+        detected = sprite.RenderUpdates()
         for player, enemies in sprite.groupcollide(self, hostile, False, False, sprite.collide_circle).items():
             for enemy in enemies:
                 player.knockback(enemy)
@@ -273,7 +275,7 @@ class Wave(sprite.Group):
         for member in detected.sprites():
             member.damage()
 
-    def hit_by(self, projectiles: sprite.Group) -> None:
+    def hit_by(self, projectiles:sprite.RenderUpdates) -> None:
         """Detect collision between projectiles and their spaceship target.
         This method should be called on the enemy instance with projectiles as argument.
         Colliding projectiles get killed off (dokill2=True).
@@ -281,6 +283,42 @@ class Wave(sprite.Group):
         for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
             member.damage()
             self._score += SCORE_HULL_DAMAGE * member.n
+
+
+class Text(sprite.Sprite):
+    """Handle on-screen texts as sprites."""
+    def __init__(self, font_name, font_size, text, font_color, pos) -> None:
+        """Initialize a sprite object.
+        font_name:  name of font including its path as string
+        font_size:  size in pixels
+        text:       text to be displayed
+        font_color: use this color to render the text
+        pos:        topleft coordinates"""
+        self._font = font.Font(font_name, font_size)
+        self._text = text
+        self._font_color = font_color
+        self._pos = pos
+        super().__init__()
+
+    @property
+    def image(self) -> pygame.Surface:
+        """Return the text's surface."""
+        return self._font.render(self._text, True, self._font_color)
+
+    @property
+    def rect(self) -> pygame.Rect:
+        """Return the text's rect."""
+        return self.image.get_rect(topleft=self._pos)
+
+    def update(self, text):
+        """Update the text.
+        text:   text as string"""
+        self._text = text
+
+    def draw(self, screen):
+        """Draw text on screen.
+        screen: display surface"""
+        screen.blit(self.image, self.rect)
 
 
 class Euclides:
@@ -302,12 +340,14 @@ class Euclides:
         # setup display
         screen = pygame.display.set_mode(SCREEN_SIZE)
 
-        # setup fonts
-        score_font = font.Font("font/Monofett-Regular.ttf", 40)
-
         # setup player
         player = Player()
         pygame.mouse.set_pos(PLAYER_START_POSITION)
+
+        # setup scores
+        score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_COORDS)
+        hiscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_COORDS)
+        scores = sprite.RenderUpdates(score, hiscore)
 
         # setup sprite groups
         friendly = Wave((player, ))
@@ -353,21 +393,20 @@ class Euclides:
             # check whether player's projectile hits an enemy
             hostile.hit_by(friendly_fire)
             # check player collisions with enemy craft
-            friendly.contact(hostile)  # player gets invulnerable for a while after collision
+            friendly.contact(hostile)
 
-            # show score
-            self._show_text(screen, (10, 10), score_font, "score: {:07}".format(hostile.score))
+            # update score
+            score.update("score: {:07}".format(hostile.score))
 
-            # show hi-score
-            hiscore = self._hiscore if hostile.score <= self._hiscore else hostile.score
-            self._show_text(screen, (440, 10), score_font, "hiscore: {:07}".format(hiscore))
+            # update hi-score
+            actual_hiscore = self._hiscore if hostile.score <= self._hiscore else hostile.score
+            hiscore.update("hiscore: {:07}".format(actual_hiscore))
 
             # update sprites
-            friendly.handle(screen)
-            friendly_fire.handle(screen)
-            hostile.handle(screen)
+            changed = friendly.handle(screen) + friendly_fire.handle(screen) + hostile.handle(screen)\
+                + scores.draw(screen)
 
-            pygame.display.flip()
+            pygame.display.update(changed)
 
         self._exit(hostile.score)
 
@@ -382,11 +421,6 @@ class Euclides:
             y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
             angle = math.radians(random.randrange(315, 345, 1))
             wave.add(Enemy(size, n, (x, y), speed, angle))
-
-    def _show_text(self, screen:pygame.Surface, pos:tuple, font:font.Font, text:str) -> None:
-        """Show textual information on game screen."""
-        text_render = font.render(text, True, WHITE)
-        screen.blit(text_render, pos)
 
     def _exit(self, score:int) -> None:
         """Nicely exit the game.
