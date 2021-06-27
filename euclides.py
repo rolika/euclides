@@ -43,7 +43,7 @@ SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
 
 
-class Status(enum.Enum):
+class State(enum.Enum):
     """Euclides game states"""
     QUIT = enum.auto()
     TITLE = enum.auto()
@@ -266,7 +266,7 @@ class Wave(sprite.RenderUpdates):
         """For simplicity, score is calculated for every wave, but only that of enemies will be evaulated."""
         return self._score
 
-    def handle(self, screen:pygame.Surface) -> None:
+    def update(self, *args, **kwargs) -> None:
         """Handle sprites within the group.
         screen: game's display Surface"""
         for member in self.sprites():
@@ -274,8 +274,10 @@ class Wave(sprite.RenderUpdates):
             if getattr(member, "is_destroyed", None):
                 self._score += SCORE_DESTROY_ENEMY * member.n
                 member.kill()  # remove from group
+        screen = kwargs.get("screen", None)
+        assert screen
         changed = self.draw(screen)
-        self.update()
+        super().update()
         return changed
 
     def contact(self, hostile:sprite.RenderUpdates):
@@ -326,9 +328,11 @@ class Text(sprite.Sprite):
         """Return the text's rect."""
         return self.image.get_rect(center=self._pos)
 
-    def update(self, text):
+    def update(self, *args, **kwargs):
         """Update the text.
         text:   text as string"""
+        text = kwargs.get("text", None)
+        assert text
         self._text = text
 
     def draw(self, screen):
@@ -414,15 +418,15 @@ class Euclides:
             self._friendly.contact(self._hostile)
 
             # update score
-            self._score.update("score: {:07}".format(self._hostile.score))
+            self._score.update(text="score: {:07}".format(self._hostile.score))
 
             # update hi-score
             actual_hiscore = self._hiscore if self._hostile.score <= self._hiscore else self._hostile.score
-            self._highscore.update("hiscore: {:07}".format(actual_hiscore))
+            self._highscore.update(text="hiscore: {:07}".format(actual_hiscore))
 
             # update sprites
-            changed = self._friendly.handle(self._screen) + self._fire.handle(self._screen)\
-                + self._hostile.handle(self._screen) + self._texts.draw(self._screen)
+            changed = self._friendly.update(screen=self._screen) + self._fire.update(screen=self._screen)\
+                + self._hostile.update(screen=self._screen) + self._texts.draw(self._screen)
 
             pygame.display.update(changed)
 
