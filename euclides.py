@@ -209,6 +209,9 @@ class Player(Spaceship):
         now = time.get_ticks()
         time_since_last_fire = now - self._last_fire
         return time_since_last_fire >= WEAPON_COOLDOWN
+    
+    def set_last_fire(self):
+        self._last_fire = time.get_ticks()
 
     def opens(self, fire) -> None:
         """Player opens fire.
@@ -386,12 +389,12 @@ class Euclides:
         while True:
             if self._state == State.INTRO:
                 self._onscreen.empty()
-                self._onscreen.add(self._score, self._highscore, self._title, self._subtitle, self._friendly)
+                self._onscreen.add(self._score, self._highscore, self._title, self._subtitle, self._player)
                 self._state = self._intro()
 
             if self._state == State.PLAY:
                 self._onscreen.empty()
-                self._onscreen.add(self._score, self._highscore, self._friendly, self._fire, self._hostile)
+                self._onscreen.add(self._score, self._highscore, self._player, self._fire, self._hostile)
                 self._score.update(text="score: {:07}".format(0))
                 self._state = self._play()
 
@@ -437,7 +440,9 @@ class Euclides:
 
             # shoot player projectiles
             if self._player.is_ready_to_fire() and self._player.fires:
-                self._player.opens(self._fire)
+                self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED, PI*1.5))
+                self._onscreen.add(self._fire)
+                self._player.set_last_fire()
 
             # check whether player's projectile hits an enemy
             self._hostile.hit_by(self._fire)
@@ -447,6 +452,7 @@ class Euclides:
                 self._n += 1
                 self._speed += ENEMY_SPEED_INCREMENT
                 self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
+                self._onscreen.add(self._hostile)
 
             # check player collisions with enemy craft
             self._friendly.contact(self._hostile)
