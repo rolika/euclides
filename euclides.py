@@ -209,10 +209,15 @@ class Player(Spaceship):
         now = time.get_ticks()
         time_since_last_fire = now - self._last_fire
         return time_since_last_fire >= WEAPON_COOLDOWN
-    
+
     def set_last_fire(self) -> None:
         """Set timer for weapon cooldown."""
         self._last_fire = time.get_ticks()
+
+    def reset(self) -> None:
+        """When player restarts the game."""
+        self._hull = PLAYER_VERTICES
+        self.rect.center = PLAYER_START_POSITION
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -295,7 +300,7 @@ class Wave(sprite.RenderUpdates):
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
-        self._score = 0
+        self.reset()
 
     @property
     def score(self) -> int:
@@ -336,6 +341,11 @@ class Wave(sprite.RenderUpdates):
             enemy.damage()
             player.damage()
 
+    def reset(self):
+        """When player restarts the game."""
+        self._score = 0
+        self.empty()
+
 
 class Euclides:
     """Main game application."""
@@ -359,7 +369,11 @@ class Euclides:
         self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_COORDS)
         self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_COORDS)
         self._score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_COORDS)
-        self._highscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_COORDS)
+        self._highscore = Text("font/Monofett-Regular.ttf",
+                               40,
+                               "hiscore: {:07}".format(self._hiscore),
+                               WHITE,
+                               HISCORE_COORDS)
 
         # setup sprite groups
         self._fire = Wave()  # container for player's projectiles
@@ -375,11 +389,13 @@ class Euclides:
         while True:
             if self._state == State.INTRO:
                 self._onscreen.empty()
+                self._player.reset()
                 self._onscreen.add(self._score, self._highscore, self._title, self._subtitle, self._player)
                 self._state = self._intro()
 
             if self._state == State.PLAY:
                 self._onscreen.empty()
+                self._hostile.reset()
                 self._onscreen.add(self._score, self._highscore, self._player, self._fire, self._hostile)
                 self._score.update(text="score: {:07}".format(0))
                 self._state = self._play()
@@ -427,7 +443,7 @@ class Euclides:
                     self._player.fires = True  # open fire
                 if event.type == MOUSEBUTTONUP:
                     self._player.fires = False  # cease fire
-            
+
             # setup enemy wave
             if not bool(self._hostile):
                 size += ENEMY_SIZE_DECREMENT
