@@ -4,7 +4,6 @@ from pygame import time
 from pygame import font
 from pygame.locals import *
 import math
-import sys
 import random
 import shelve
 import enum
@@ -46,8 +45,8 @@ SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
 class State(enum.Enum):
     """Euclides game states"""
     QUIT = enum.auto()
-    TITLE = enum.auto()
-    GAME = enum.auto()
+    INTRO = enum.auto()
+    PLAY = enum.auto()
 
 
 class Trig:
@@ -128,7 +127,7 @@ class Enemy(Spaceship):
         super().__init__(size, n, pos)
         self._dx, self._dy = Trig.offset(displacement, angle)  # enemies move right away after spawning
 
-    def update(self) -> None:
+    def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
         self._keep_on_screen()
         self.rect.centerx += self._dx
@@ -178,9 +177,11 @@ class Player(Spaceship):
         state:  boolean value"""
         self._fires = state
 
-    def update(self) -> None:
+    def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
-        self._keep_on_screen(*pygame.mouse.get_pos())        
+        state = kwargs.pop("state", None)
+        if state == State.PLAY:
+            self._keep_on_screen(*pygame.mouse.get_pos())
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
@@ -208,7 +209,7 @@ class Player(Spaceship):
         now = time.get_ticks()
         time_since_last_fire = now - self._last_fire
         return time_since_last_fire >= WEAPON_COOLDOWN
-    
+
     def opens(self, fire) -> None:
         """Player opens fire.
         fire:   sprite container for player's projectiles"""
@@ -243,7 +244,7 @@ class Projectile(Polygon):
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
 
-    def update(self) -> None:
+    def update(self, *args, **kwargs) -> None:
         """Update the projectile sprite."""
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
@@ -274,10 +275,10 @@ class Wave(sprite.RenderUpdates):
             if getattr(member, "is_destroyed", None):
                 self._score += SCORE_DESTROY_ENEMY * member.n
                 member.kill()  # remove from group
-        screen = kwargs.get("screen", None)
+        screen = kwargs.pop("screen", None)
         assert screen
         changed = self.draw(screen)
-        super().update()
+        super().update(*args, **kwargs)
         return changed
 
     def contact(self, hostile:sprite.RenderUpdates):
@@ -329,11 +330,10 @@ class Text(sprite.Sprite):
         return self.image.get_rect(center=self._pos)
 
     def update(self, *args, **kwargs):
-        """Update the text.
-        text:   text as string"""
+        """Update the text."""
         text = kwargs.get("text", None)
-        assert text
-        self._text = text
+        if text:
+            self._text = text
 
     def draw(self, screen):
         """Draw text on screen.
@@ -358,14 +358,12 @@ class Euclides:
 
         # setup player
         self._player = Player()
-        pygame.mouse.set_pos(PLAYER_START_POSITION)
 
         # setup scores
         self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_COORDS)
         self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_COORDS)
         self._score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_COORDS)
         self._highscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_COORDS)
-        self._texts = sprite.RenderUpdates(self._title, self._subtitle, self._score, self._highscore)
 
         # setup sprite groups
         self._friendly = Wave((self._player, ))  # container for friendly aircraft
@@ -378,44 +376,83 @@ class Euclides:
         self._speed = ENEMY_STARTING_SPEED
         self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
 
+        self._state = State.INTRO
+        self._onscreen = Wave()  # container for sprites on screen
+
         self._main()
 
     def _main(self) -> None:
         """Execute the application."""
+        while True:
+            if self._state == State.INTRO:
+                self._onscreen.empty()
+                self._onscreen.add(self._score, self._highscore, self._title, self._subtitle, self._friendly)
+                self._state = self._intro()
 
-        # main game loop
-        while self._player.alive():
+            if self._state == State.PLAY:
+                self._onscreen.empty()
+                self._onscreen.add(self._score, self._highscore, self._friendly, self._fire, self._hostile)
+                self._score.update(text="score: {:07}".format(0))
+                self._state = self._play()
 
+            if self._state == State.QUIT:
+                self._state = self._exit()
+                return
+
+    def _intro(self):
+        """Show game title screen."""
+        while True:
+            time.Clock().tick(FPS)
+            self._screen.fill(BLACK)
+
+            for event in pygame.event.get():
+                if event.type == QUIT:  # exit by closing the window
+                    return State.QUIT
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:  # exit by pressing escape button
+                        return State.QUIT
+                if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(pygame.mouse.get_pos()):
+                    return State.PLAY
+
+            changed = self._onscreen.update(screen=self._screen, state=self._state)
+            pygame.display.update(changed)
+
+    def _play(self):
+        """Play the game."""
+        while True:
             time.Clock().tick(FPS)
             self._screen.fill(BLACK)
 
             # listen for user actions
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
-                    self._exit(self._hostile.score)
+                    return State.QUIT
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
-                        self._exit(self._hostile.score)
-                if event.type == MOUSEBUTTONDOWN:  # open fire
-                    self._player.fires = True
-                if event.type == MOUSEBUTTONUP:  # cease fire
-                    self._player.fires = False
+                        return State.QUIT
+                if event.type == MOUSEBUTTONDOWN:
+                    self._player.fires = True  # open fire
+                if event.type == MOUSEBUTTONUP:
+                    self._player.fires = False  # cease fire
 
             # shoot player projectiles
             if self._player.is_ready_to_fire() and self._player.fires:
                 self._player.opens(self._fire)
 
-            # spawn new enemy wave when the former is destroyed
+            # check whether player's projectile hits an enemy
+            self._hostile.hit_by(self._fire)
+            # spawn new enemy wave when former is destroyed
             if not bool(self._hostile):
                 self._size += ENEMY_SIZE_INCREMENT
                 self._n += 1
                 self._speed += ENEMY_SPEED_INCREMENT
                 self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
 
-            # check whether player's projectile hits an enemy
-            self._hostile.hit_by(self._fire)
             # check player collisions with enemy craft
             self._friendly.contact(self._hostile)
+            # check if player is still alive
+            if not self._player.alive():
+                return State.INTRO
 
             # update score
             self._score.update(text="score: {:07}".format(self._hostile.score))
@@ -425,15 +462,18 @@ class Euclides:
             self._highscore.update(text="hiscore: {:07}".format(actual_hiscore))
 
             # update sprites
-            changed = self._friendly.update(screen=self._screen) + self._fire.update(screen=self._screen)\
-                + self._hostile.update(screen=self._screen) + self._texts.draw(self._screen)
-
+            changed = self._onscreen.update(screen=self._screen, state=self._state)
             pygame.display.update(changed)
 
-        self._exit(self._hostile.score)
-    
-    def _show_title(self):
-        pass
+    def _exit(self) -> None:
+        """Nicely exit the game."""
+        print("Last Euclides score:", self._hostile.score)
+        # save new hi-score
+        if self._hostile.score > self._hiscore:
+            print("It's a new hi-score!")
+            with shelve.open("hiscore") as hsc:
+                hsc["hiscore"] = self._hostile.score
+        pygame.quit()
 
     def _spawn_enemy_wave(self, wave:Wave, size: int, n:int, speed:int) -> None:
         """Spawn a new enemy wave.
@@ -446,18 +486,6 @@ class Euclides:
             y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
             angle = math.radians(random.randrange(315, 345, 1))
             wave.add(Enemy(size, n, (x, y), speed, angle))
-
-    def _exit(self, score:int) -> None:
-        """Nicely exit the game.
-        score:  last achieved score"""
-        print("Last Euclides score:", score)
-        # save new hi-score
-        if score > self._hiscore:
-            print("It's a new hi-score!")
-            with shelve.open("hiscore") as hsc:
-                hsc["hiscore"] = score
-        pygame.quit()
-        sys.exit()
 
 
 if __name__ == "__main__":
