@@ -214,15 +214,6 @@ class Player(Spaceship):
         """Set timer for weapon cooldown."""
         self._last_fire = time.get_ticks()
 
-    def contact(self, hostile:sprite.RenderUpdates):
-        """Detect collision between player and enemy polygons and reduce their hull.
-        player:     player sprite
-        hostile:    wave of enemy sprites"""
-        for enemy in sprite.spritecollide(self, hostile, False, sprite.collide_circle):
-            self.knockback(enemy)
-            enemy.damage()
-            self.damage()
-
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
         x:  intended next horizontal center coordinate
@@ -333,6 +324,17 @@ class Wave(sprite.RenderUpdates):
         for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
             member.damage()
             self._score += SCORE_HULL_DAMAGE * member.n
+            if member.is_destroyed:
+                self._score += SCORE_DESTROY_ENEMY * member.n
+                member.kill()  # remove from group
+
+    def contact(self, player:sprite.Sprite):
+        """Detect collision between player and enemy polygons and reduce their hull.
+        player:     player sprite"""
+        for enemy in sprite.spritecollide(player, self, False, sprite.collide_circle):
+            player.knockback(enemy)
+            enemy.damage()
+            player.damage()
 
 
 class Euclides:
@@ -448,7 +450,7 @@ class Euclides:
             self._hostile.hit_by(self._fire)
 
             # check player collisions with enemy craft
-            self._player.contact(self._hostile)
+            self._hostile.contact(self._player)
 
             # check if player is still alive
             if not self._player.alive():
