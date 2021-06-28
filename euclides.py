@@ -25,9 +25,9 @@ PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
 PLAYER_PROJECTILE_SPEED = 15
 WEAPON_COOLDOWN = 50  # player can fire at this rate (milliseconds)
 
-ENEMY_STARTING_SIZE = 100
-ENEMY_SIZE_INCREMENT = -5
-ENEMY_STARTING_SPEED = 3
+ENEMY_STARTING_SIZE = 105
+ENEMY_SIZE_DECREMENT = -5
+ENEMY_STARTING_SPEED = 2.5
 ENEMY_SPEED_INCREMENT = 0.5
 ENEMY_STARTING_VERTICES = 4
 ENEMY_PROJECTILE_STARTING_SPEED = 2
@@ -210,14 +210,18 @@ class Player(Spaceship):
         time_since_last_fire = now - self._last_fire
         return time_since_last_fire >= WEAPON_COOLDOWN
     
-    def set_last_fire(self):
+    def set_last_fire(self) -> None:
+        """Set timer for weapon cooldown."""
         self._last_fire = time.get_ticks()
 
-    def opens(self, fire) -> None:
-        """Player opens fire.
-        fire:   sprite container for player's projectiles"""
-        fire.add(Projectile(self, PLAYER_PROJECTILE_SPEED, PI*1.5))
-        self._last_fire = time.get_ticks()
+    def contact(self, hostile:sprite.RenderUpdates):
+        """Detect collision between player and enemy polygons and reduce their hull.
+        player:     player sprite
+        hostile:    wave of enemy sprites"""
+        for enemy in sprite.spritecollide(self, hostile, False, sprite.collide_circle):
+            self.knockback(enemy)
+            enemy.damage()
+            self.damage()
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -257,56 +261,6 @@ class Projectile(Polygon):
             self.kill()
 
 
-class Wave(sprite.RenderUpdates):
-    """Custom sprite.RenderUpdates to check on player and enemy hull damage and convinient sprite update."""
-    def __init__(self, *sprites:Polygon) -> None:
-        """Uses default initialization.
-        sprites:    any number of sprite objects"""
-        super().__init__(*sprites)
-        self._score = 0
-
-    @property
-    def score(self) -> int:
-        """For simplicity, score is calculated for every wave, but only that of enemies will be evaulated."""
-        return self._score
-
-    def update(self, *args, **kwargs) -> None:
-        """Handle sprites within the group.
-        screen: game's display Surface"""
-        for member in self.sprites():
-            # getattr is needed, because Projectile doesn't have the is_destroyed() method.
-            if getattr(member, "is_destroyed", None):
-                self._score += SCORE_DESTROY_ENEMY * member.n
-                member.kill()  # remove from group
-        screen = kwargs.pop("screen", None)
-        assert screen
-        changed = self.draw(screen)
-        super().update(*args, **kwargs)
-        return changed
-
-    def contact(self, hostile:sprite.RenderUpdates):
-        """Detect collision between player and enemy polygons and reduce their hull.
-        This method should be called on the player instance with the enemy wave as argument.
-        hostile:    wave of enemy sprites"""
-        detected = sprite.RenderUpdates()
-        for player, enemies in sprite.groupcollide(self, hostile, False, False, sprite.collide_circle).items():
-            for enemy in enemies:
-                player.knockback(enemy)
-            detected.add(player)
-            detected.add(*enemies)
-        for member in detected.sprites():
-            member.damage()
-
-    def hit_by(self, projectiles:sprite.RenderUpdates) -> None:
-        """Detect collision between projectiles and their spaceship target.
-        This method should be called on the enemy instance with projectiles as argument.
-        Colliding projectiles get killed off (dokill2=True).
-        projectile: wave of projectiles"""
-        for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
-            member.damage()
-            self._score += SCORE_HULL_DAMAGE * member.n
-
-
 class Text(sprite.Sprite):
     """Handle on-screen texts as sprites."""
     def __init__(self, font_name, font_size, text, font_color, pos) -> None:
@@ -344,6 +298,43 @@ class Text(sprite.Sprite):
         screen.blit(self.image, self.rect)
 
 
+class Wave(sprite.RenderUpdates):
+    """Custom sprite.RenderUpdates to check on player and enemy hull damage and convinient sprite update."""
+    def __init__(self, *sprites:Polygon) -> None:
+        """Uses default initialization.
+        sprites:    any number of sprite objects"""
+        super().__init__(*sprites)
+        self._score = 0
+
+    @property
+    def score(self) -> int:
+        """For simplicity, score is calculated for every wave, but only that of enemies will be evaulated."""
+        return self._score
+
+    def update(self, *args, **kwargs) -> None:
+        """Handle sprites within the group.
+        screen: game's display Surface"""
+        for member in self.sprites():
+            # getattr is needed, because only player and enemies have the is_destroyed() method.
+            if getattr(member, "is_destroyed", None):
+                self._score += SCORE_DESTROY_ENEMY * member.n
+                member.kill()  # remove from group
+        screen = kwargs.pop("screen", None)
+        assert screen
+        changed = self.draw(screen)
+        super().update(*args, **kwargs)
+        return changed
+
+    def hit_by(self, projectiles:sprite.RenderUpdates) -> None:
+        """Detect collision between projectiles and their spaceship target.
+        This method should be called on the enemy instance with projectiles as argument.
+        Colliding projectiles get killed off (dokill2=True).
+        projectile: wave of projectiles"""
+        for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
+            member.damage()
+            self._score += SCORE_HULL_DAMAGE * member.n
+
+
 class Euclides:
     """Main game application."""
     def __init__(self) -> None:
@@ -369,15 +360,8 @@ class Euclides:
         self._highscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_COORDS)
 
         # setup sprite groups
-        self._friendly = Wave((self._player, ))  # container for friendly aircraft
         self._fire = Wave()  # container for player's projectiles
         self._hostile = Wave()  # container for enemy aircrafts
-
-        # setup first enemy wave
-        self._size = ENEMY_STARTING_SIZE
-        self._n = 4  # enemy wave (number of enemies & number of vertices)
-        self._speed = ENEMY_STARTING_SPEED
-        self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
 
         self._state = State.INTRO
         self._onscreen = Wave()  # container for sprites on screen
@@ -422,6 +406,10 @@ class Euclides:
 
     def _play(self):
         """Play the game."""
+        size = ENEMY_STARTING_SIZE
+        n = 3
+        speed = ENEMY_STARTING_SPEED
+
         while True:
             time.Clock().tick(FPS)
             self._screen.fill(BLACK)
@@ -437,6 +425,18 @@ class Euclides:
                     self._player.fires = True  # open fire
                 if event.type == MOUSEBUTTONUP:
                     self._player.fires = False  # cease fire
+            
+            # setup enemy wave
+            if not bool(self._hostile):
+                size += ENEMY_SIZE_DECREMENT
+                n += 1
+                speed += ENEMY_SPEED_INCREMENT
+                for i in range(n):
+                    x = random.randrange(0, SCREEN_WIDTH, 1)
+                    y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
+                    angle = math.radians(random.randrange(315, 345, 1))
+                    self._hostile.add(Enemy(size, n, (x, y), speed, angle))
+                self._onscreen.add(self._hostile)
 
             # shoot player projectiles
             if self._player.is_ready_to_fire() and self._player.fires:
@@ -446,16 +446,10 @@ class Euclides:
 
             # check whether player's projectile hits an enemy
             self._hostile.hit_by(self._fire)
-            # spawn new enemy wave when former is destroyed
-            if not bool(self._hostile):
-                self._size += ENEMY_SIZE_INCREMENT
-                self._n += 1
-                self._speed += ENEMY_SPEED_INCREMENT
-                self._spawn_enemy_wave(self._hostile, self._size, self._n, self._speed)
-                self._onscreen.add(self._hostile)
 
             # check player collisions with enemy craft
-            self._friendly.contact(self._hostile)
+            self._player.contact(self._hostile)
+
             # check if player is still alive
             if not self._player.alive():
                 return State.INTRO
@@ -480,18 +474,6 @@ class Euclides:
             with shelve.open("hiscore") as hsc:
                 hsc["hiscore"] = self._hostile.score
         pygame.quit()
-
-    def _spawn_enemy_wave(self, wave:Wave, size: int, n:int, speed:int) -> None:
-        """Spawn a new enemy wave.
-        wave:   sprite container for enemies
-        size:   enemy size in pixels
-        n:      number of vertices
-        speed:  displacement in pixels"""
-        for i in range(n):
-            x = random.randrange(0, SCREEN_WIDTH, 1)
-            y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
-            angle = math.radians(random.randrange(315, 345, 1))
-            wave.add(Enemy(size, n, (x, y), speed, angle))
 
 
 if __name__ == "__main__":
