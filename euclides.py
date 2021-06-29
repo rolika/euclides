@@ -289,11 +289,6 @@ class Text(sprite.Sprite):
         if text:
             self._text = text
 
-    def draw(self, screen):
-        """Draw text on screen.
-        screen: display surface"""
-        screen.blit(self.image, self.rect)
-
 
 class Wave(sprite.RenderUpdates):
     """Custom sprite.RenderUpdates to check on player and enemy hull damage and convinient sprite update."""
