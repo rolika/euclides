@@ -258,7 +258,7 @@ class Projectile(Polygon):
             self.kill()
 
 
-class Text(sprite.Sprite):
+class PlainText(sprite.Sprite):
     """Handle on-screen texts as sprites."""
     def __init__(self, font_name, font_size, text, font_color, pos) -> None:
         """Initialize a sprite object.
@@ -266,7 +266,7 @@ class Text(sprite.Sprite):
         font_size:  size in pixels
         text:       text to be displayed
         font_color: use this color to render the text
-        pos:        topleft coordinates"""
+        pos:        center coordinates"""
         self._font = font.Font(font_name, font_size)
         self._text = text
         self._font_color = font_color
@@ -283,11 +283,40 @@ class Text(sprite.Sprite):
         """Return the text's rect."""
         return self.image.get_rect(center=self._pos)
 
+
+class Score(PlainText):
+    """Handle on-screen texts as sprites."""
+    def __init__(self, font_name, font_size, font_color, pos) -> None:
+        """Initialize a sprite object.
+        font_name:  name of font including its path as string
+        font_size:  size in pixels
+        font_color: use this color to render the text
+        pos:        center coordinates"""
+        super().__init__(font_name, font_size, "", font_color, pos)
+
     def update(self, *args, **kwargs):
         """Update the text."""
-        text = kwargs.get("text", None)
-        if text:
-            self._text = text
+        score = kwargs.get("score", None)
+        self._text = self._format("score", score)
+
+    def _format(self, score_text, score) -> str:
+        return score_text + " {:07}".format(score if score else 0)
+
+
+class HiScore(Score):
+    """Handle on-screen texts as sprites."""
+    def __init__(self, font_name, font_size, hiscore, font_color, pos) -> None:
+        """Initialize a sprite object.
+        font_name:  name of font including its path as string
+        font_size:  size in pixels
+        font_color: use this color to render the text
+        pos:        center coordinates"""
+        super().__init__(font_name, font_size, font_color, pos)
+
+    def update(self, *args, **kwargs):
+        """Update the text."""
+        score = kwargs.get("hiscore", None)
+        self._text = self._format("hiscore", score)
 
 
 class Wave(sprite.RenderUpdates):
@@ -309,7 +338,6 @@ class Wave(sprite.RenderUpdates):
         for member in self.sprites():
             # getattr is needed, because only player and enemies have the is_destroyed() method.
             if getattr(member, "is_destroyed", None):
-                self._score += SCORE_DESTROY_ENEMY * member.n
                 member.kill()  # remove from group
         screen = kwargs.pop("screen", None)
         assert screen
@@ -362,10 +390,10 @@ class Euclides:
         self._player = Player()
 
         # setup scores
-        self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_POS)
-        self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
-        self._score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_POS)
-        self._highscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_POS)
+        self._title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_POS)
+        self._subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
+        self._score = Score("font/Monofett-Regular.ttf", 40, WHITE, SCORE_POS)
+        self._highscore = HiScore("font/Monofett-Regular.ttf", 40, str(self._hiscore), WHITE, HISCORE_POS)
 
         # setup sprite groups
         self._fire = Wave()  # container for player's projectiles
@@ -382,6 +410,7 @@ class Euclides:
             if self._state == State.INTRO:
                 self._onscreen.empty()
                 self._player.reset()
+                self._score.update(score=self._hostile.score)
                 self._onscreen.add(self._score, self._highscore, self._title, self._subtitle, self._player)
                 self._state = self._intro()
 
@@ -390,7 +419,7 @@ class Euclides:
                 self._hostile.reset()
                 self._fire.reset()
                 self._onscreen.add(self._score, self._highscore, self._player, self._fire, self._hostile)
-                self._score.update(text="score: {:07}".format(0))
+                self._score.update(score=0)
                 self._state = self._play()
 
             if self._state == State.END:
@@ -415,6 +444,7 @@ class Euclides:
                 if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(pygame.mouse.get_pos()):
                     return State.PLAY
 
+            self._highscore.update(hiscore=self._hiscore)
             changed = self._onscreen.update(screen=self._screen, state=self._state)
             pygame.display.update(changed)
 
@@ -468,15 +498,11 @@ class Euclides:
             if not self._player.alive():
                 return State.INTRO
 
-            # update score
-            self._score.update(text="score: {:07}".format(self._hostile.score))
-
-            # update hi-score
+            # check hiscore
             actual_hiscore = self._hiscore if self._hostile.score <= self._hiscore else self._hostile.score
-            self._highscore.update(text="hiscore: {:07}".format(actual_hiscore))
 
             # update sprites
-            changed = self._onscreen.update(screen=self._screen, state=self._state)
+            changed = self._onscreen.update(screen=self._screen, state=self._state, score=self._hostile.score, hiscore=actual_hiscore)
             pygame.display.update(changed)
 
     def _exit(self) -> None:
