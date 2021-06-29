@@ -319,8 +319,8 @@ class HiScore(Score):
         self._text = self._format("hiscore", score)
 
 
-class Wave(sprite.RenderUpdates):
-    """Custom sprite.RenderUpdates to check on player and enemy hull damage and convinient sprite update."""
+class OnScreen(sprite.RenderUpdates):
+    """Container for on-screen sprite objects."""
     def __init__(self, *sprites:Polygon) -> None:
         """Uses default initialization.
         sprites:    any number of sprite objects"""
@@ -396,11 +396,11 @@ class Euclides:
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, str(self._hiscore), WHITE, HISCORE_POS)
 
         # setup sprite groups
-        self._fire = Wave()  # container for player's projectiles
-        self._hostile = Wave()  # container for enemy aircrafts
+        self._fire = OnScreen()  # container for player's projectiles
+        self._hostile = OnScreen()  # container for enemy aircrafts
 
         self._state = State.INTRO
-        self._onscreen = Wave()  # container for sprites on screen
+        self._onscreen = OnScreen()  # container for sprites on screen
 
         self._main()
 
