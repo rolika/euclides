@@ -21,7 +21,7 @@ FPS = 60
 
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
-PLAYER_START_POSITION = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
+PLAYER_START_POS = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
 PLAYER_PROJECTILE_SPEED = 15
 WEAPON_COOLDOWN = 50  # player can fire at this rate (milliseconds)
 
@@ -33,10 +33,10 @@ ENEMY_STARTING_VERTICES = 4
 ENEMY_PROJECTILE_STARTING_SPEED = 2
 ENEMY_PROJECTILE_SPEED_INCREMENT = 1
 
-SCORE_COORDS = (160, 10)
-HISCORE_COORDS = (610, 10)
-TITLE_COORDS = (400, 300)
-SUBTITLE_COORDS = (400, 350)
+SCORE_POS = (160, 10)
+HISCORE_POS = (610, 10)
+TITLE_POS = (400, 300)
+SUBTITLE_POS = (400, 350)
 
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
@@ -47,6 +47,7 @@ class State(enum.Enum):
     QUIT = enum.auto()
     INTRO = enum.auto()
     PLAY = enum.auto()
+    END = enum.auto()
 
 
 class Trig:
@@ -161,7 +162,7 @@ class Player(Spaceship):
     """Player is represented by a regular triangle-shaped spaceship."""
     def __init__(self) -> None:
         """Initialize a triangle, representing the player."""
-        super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POSITION)
+        super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POS)
         # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
         self._last_fire = START_TIME
         self._fires = False  # player fires continously
@@ -217,7 +218,7 @@ class Player(Spaceship):
     def reset(self) -> None:
         """When player restarts the game."""
         self._hull = PLAYER_VERTICES
-        self.rect.center = PLAYER_START_POSITION
+        self.rect.center = PLAYER_START_POS
 
     def _keep_on_screen(self, x:int, y:int) -> None:
         """Always keep the whole player polygon on screen.
@@ -366,14 +367,10 @@ class Euclides:
         self._player = Player()
 
         # setup scores
-        self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_COORDS)
-        self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_COORDS)
-        self._score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_COORDS)
-        self._highscore = Text("font/Monofett-Regular.ttf",
-                               40,
-                               "hiscore: {:07}".format(self._hiscore),
-                               WHITE,
-                               HISCORE_COORDS)
+        self._title = Text("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_POS)
+        self._subtitle = Text("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
+        self._score = Text("font/Monofett-Regular.ttf", 40, "score: {:07}".format(0), WHITE, SCORE_POS)
+        self._highscore = Text("font/Monofett-Regular.ttf", 40, "hiscore: {:07}".format(self._hiscore), WHITE, HISCORE_POS)
 
         # setup sprite groups
         self._fire = Wave()  # container for player's projectiles
@@ -396,9 +393,13 @@ class Euclides:
             if self._state == State.PLAY:
                 self._onscreen.empty()
                 self._hostile.reset()
+                self._fire.reset()
                 self._onscreen.add(self._score, self._highscore, self._player, self._fire, self._hostile)
                 self._score.update(text="score: {:07}".format(0))
                 self._state = self._play()
+
+            if self._state == State.END:
+                self._onscreen.empty()
 
             if self._state == State.QUIT:
                 self._state = self._exit()
