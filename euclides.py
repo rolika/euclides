@@ -164,7 +164,6 @@ class Player(Spaceship):
     def __init__(self) -> None:
         """Initialize a triangle, representing the player."""
         super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POS)
-        # make sure player is vulnerable (invulnerability is always cooled down, since start time is almost 0)
         self._last_fire = START_TIME
         self._fires = False  # player fires continously
 
@@ -357,7 +356,7 @@ class OnScreen(sprite.RenderUpdates):
 
     @property
     def score(self) -> int:
-        """For simplicity, score is calculated for every wave, but only that of enemies will be evaulated."""
+        """For simplicity, score is calculated for every container, but only that of enemies will be evaulated."""
         return self._score
 
     def update(self, *args, **kwargs) -> None:
@@ -420,6 +419,7 @@ class Euclides:
         self._score = Score("font/Monofett-Regular.ttf", 40, WHITE, SCORE_POS)
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, str(self._hiscore), WHITE, HISCORE_POS)
         self._game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
+        self._new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
 
         # setup sprite groups
         self._fire = OnScreen()  # container for player's projectiles
@@ -450,10 +450,12 @@ class Euclides:
             if self._state == State.END:
                 self._onscreen.empty()
                 self._onscreen.add(self._score, self._highscore, self._game_over)
+                if self._hostile.score > self._hiscore:
+                    self._onscreen.add(self._new_hiscore)
                 self._state = self._end()
 
             if self._state == State.QUIT:
-                self._state = self._exit()
+                self._exit()
                 return
 
     def _intro(self):
@@ -539,7 +541,6 @@ class Euclides:
 
     def _end(self):
         """Show game over screen."""
-        print("Last Euclides score:", self._hostile.score)
         self._save_hiscore()
         self._load_hiscore()
 
@@ -576,7 +577,6 @@ class Euclides:
     def _save_hiscore(self) -> None:
         """Save hi-score to persistent dictionary."""
         if self._hostile.score > self._hiscore:
-            print("It's a new hi-score!")
             with shelve.open("hiscore") as hsc:
                 hsc["hiscore"] = self._hostile.score
 
