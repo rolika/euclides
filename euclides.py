@@ -406,10 +406,7 @@ class Euclides:
         random.seed()
         pygame.init()
         pygame.display.set_caption("Euclides")
-
-        # load highscore
-        with shelve.open("hiscore") as hsc:
-            self._hiscore = hsc.get("hiscore", 0)
+        self._load_hiscore()
 
         # setup display
         self._screen = pygame.display.set_mode(SCREEN_SIZE)
@@ -451,8 +448,8 @@ class Euclides:
                 self._state = self._play()
 
             if self._state == State.END:
-                self._onscreen.remove(self._player, self._hostile, self._fire)
-                self._onscreen.add(self._game_over)
+                self._onscreen.empty()
+                self._onscreen.add(self._score, self._highscore, self._game_over)
                 self._state = self._end()
 
             if self._state == State.QUIT:
@@ -461,6 +458,8 @@ class Euclides:
 
     def _intro(self):
         """Show game title screen."""
+        self._load_hiscore()
+
         while True:
             time.Clock().tick(FPS)
             self._screen.fill(BLACK)
@@ -541,11 +540,8 @@ class Euclides:
     def _end(self):
         """Show game over screen."""
         print("Last Euclides score:", self._hostile.score)
-        # save new hi-score
-        if self._hostile.score > self._hiscore:
-            print("It's a new hi-score!")
-            with shelve.open("hiscore") as hsc:
-                hsc["hiscore"] = self._hostile.score
+        self._save_hiscore()
+        self._load_hiscore()
 
         while True:
             time.Clock().tick(FPS)
@@ -561,12 +557,28 @@ class Euclides:
                 if event.type == MOUSEBUTTONUP and self._game_over.rect.collidepoint(pygame.mouse.get_pos()):
                     return State.INTRO
 
-            changed = self._onscreen.update(screen=self._screen, state=self._state, score=self._hostile.score, hiscore=self._hiscore, mouse_pos=pygame.mouse.get_pos())
+            changed = self._onscreen.update(screen=self._screen,
+                                            score=self._hostile.score,
+                                            hiscore=self._hiscore,
+                                            mouse_pos=pygame.mouse.get_pos())
             pygame.display.update(changed)
 
     def _exit(self) -> None:
         """Nicely exit the game."""
+        self._save_hiscore()
         pygame.quit()
+
+    def _load_hiscore(self):
+        """Load hi-score from persistent dictionary."""
+        with shelve.open("hiscore") as hsc:
+            self._hiscore = hsc.get("hiscore", 0)
+
+    def _save_hiscore(self) -> None:
+        """Save hi-score to persistent dictionary."""
+        if self._hostile.score > self._hiscore:
+            print("It's a new hi-score!")
+            with shelve.open("hiscore") as hsc:
+                hsc["hiscore"] = self._hostile.score
 
 
 if __name__ == "__main__":
