@@ -182,7 +182,7 @@ class Player(Spaceship):
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
         state = kwargs.pop("state", None)
         if state == State.PLAY:
-            self._keep_on_screen(*pygame.mouse.get_pos())
+            self._keep_on_screen(*mouse.get_pos())
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
@@ -472,7 +472,7 @@ class Euclides:
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
-                if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(pygame.mouse.get_pos()):
+                if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(mouse.get_pos()):
                     return State.PLAY
 
             self._highscore.update(hiscore=self._hiscore)
@@ -555,13 +555,13 @@ class Euclides:
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
-                if event.type == MOUSEBUTTONUP and self._game_over.rect.collidepoint(pygame.mouse.get_pos()):
+                if event.type == MOUSEBUTTONUP and self._game_over.rect.collidepoint(mouse.get_pos()):
                     return State.INTRO
 
             changed = self._onscreen.update(screen=self._screen,
                                             score=self._hostile.score,
                                             hiscore=self._hiscore,
-                                            mouse_pos=pygame.mouse.get_pos())
+                                            mouse_pos=mouse.get_pos())
             pygame.display.update(changed)
 
     def _exit(self) -> None:
