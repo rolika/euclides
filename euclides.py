@@ -2,6 +2,7 @@ import pygame
 from pygame import sprite
 from pygame import time
 from pygame import font
+from pygame import mouse
 from pygame.locals import *
 import math
 import random
@@ -285,7 +286,7 @@ class PlainText(sprite.Sprite):
 
 
 class Score(PlainText):
-    """Handle on-screen texts as sprites."""
+    """Handle score as sprites."""
     def __init__(self, font_name, font_size, font_color, pos) -> None:
         """Initialize a sprite object.
         font_name:  name of font including its path as string
@@ -304,7 +305,7 @@ class Score(PlainText):
 
 
 class HiScore(Score):
-    """Handle on-screen texts as sprites."""
+    """Handle hiscore as sprites."""
     def __init__(self, font_name, font_size, hiscore, font_color, pos) -> None:
         """Initialize a sprite object.
         font_name:  name of font including its path as string
@@ -317,6 +318,33 @@ class HiScore(Score):
         """Update the text."""
         score = kwargs.get("hiscore", None)
         self._text = self._format("hiscore", score)
+
+
+class UIButton(PlainText):
+    """Button-like user interface."""
+    def __init__(self, font_name, font_size, text, font_color, pos, action) -> None:
+        self._action = action
+        self._mouse_over = False
+        highlighted_font = font.Font(font_name, font_size*2)
+        self._highlighted_image = highlighted_font.render(text, True, font_color)
+        self._highlighted_rect = self._highlighted_image.get_rect(center=pos)
+        super().__init__(font_name, font_size, text, font_color, pos)
+
+    @property
+    def image(self):
+        return self._highlighted_image if self._mouse_over else super().image
+
+    @property
+    def rect(self):
+        return self._highlighted_rect if self._mouse_over else super().rect
+
+    def update(self, *args, **kwargs):
+        mouse_pos = kwargs.pop("mouse_pos", None)
+        assert mouse_pos
+        if self.rect.collidepoint(mouse_pos):
+            self._mouse_over = True
+        else:
+            self._mouse_over = False
 
 
 class OnScreen(sprite.RenderUpdates):
@@ -394,6 +422,7 @@ class Euclides:
         self._subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
         self._score = Score("font/Monofett-Regular.ttf", 40, WHITE, SCORE_POS)
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, str(self._hiscore), WHITE, HISCORE_POS)
+        self._game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
 
         # setup sprite groups
         self._fire = OnScreen()  # container for player's projectiles
@@ -410,7 +439,6 @@ class Euclides:
             if self._state == State.INTRO:
                 self._onscreen.empty()
                 self._player.reset()
-                self._score.update(score=self._hostile.score)
                 self._onscreen.add(self._score, self._highscore, self._title, self._subtitle, self._player)
                 self._state = self._intro()
 
@@ -423,7 +451,9 @@ class Euclides:
                 self._state = self._play()
 
             if self._state == State.END:
-                self._onscreen.empty()
+                self._onscreen.remove(self._player, self._hostile, self._fire)
+                self._onscreen.add(self._game_over)
+                self._state = self._end()
 
             if self._state == State.QUIT:
                 self._state = self._exit()
@@ -496,23 +526,46 @@ class Euclides:
 
             # check if player is still alive
             if not self._player.alive():
-                return State.INTRO
+                return State.END
 
-            # check hiscore
+            # update hiscore
             actual_hiscore = self._hiscore if self._hostile.score <= self._hiscore else self._hostile.score
 
             # update sprites
-            changed = self._onscreen.update(screen=self._screen, state=self._state, score=self._hostile.score, hiscore=actual_hiscore)
+            changed = self._onscreen.update(screen=self._screen,
+                                            state=self._state,
+                                            score=self._hostile.score,
+                                            hiscore=actual_hiscore)
             pygame.display.update(changed)
 
-    def _exit(self) -> None:
-        """Nicely exit the game."""
+    def _end(self):
+        """Show game over screen."""
         print("Last Euclides score:", self._hostile.score)
         # save new hi-score
         if self._hostile.score > self._hiscore:
             print("It's a new hi-score!")
             with shelve.open("hiscore") as hsc:
                 hsc["hiscore"] = self._hostile.score
+
+        while True:
+            time.Clock().tick(FPS)
+            self._screen.fill(BLACK)
+
+            mouse_up = False
+            for event in pygame.event.get():
+                if event.type == QUIT:  # exit by closing the window
+                    return State.QUIT
+                if event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:  # exit by pressing escape button
+                        return State.QUIT
+                if event.type == MOUSEBUTTONUP and self._game_over.rect.collidepoint(pygame.mouse.get_pos()):
+                    return State.INTRO
+
+            changed = self._onscreen.update(screen=self._screen, state=self._state, score=self._hostile.score, hiscore=self._hiscore, mouse_pos=pygame.mouse.get_pos())
+            pygame.display.update(changed)
+
+    def _exit(self) -> None:
+        """Nicely exit the game."""
         pygame.quit()
 
 
