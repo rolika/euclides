@@ -3,6 +3,7 @@ from pygame import sprite
 from pygame import time
 from pygame import font
 from pygame import mouse
+from pygame import mixer
 from pygame.locals import *
 import math
 import random
@@ -404,6 +405,7 @@ class Euclides:
         # initialize game objects
         random.seed()
         pygame.init()
+        mixer.set_num_channels(128)  # needed because of the continous fire
         pygame.display.set_caption("Euclides")
         self._load_hiscore()
 
@@ -485,6 +487,9 @@ class Euclides:
         n = 3
         speed = ENEMY_STARTING_SPEED
 
+        # setup sounds
+        shot_sound = mixer.Sound("wav/gunshot.wav")
+
         while True:
             time.Clock().tick(FPS)
             self._screen.fill(BLACK)
@@ -518,6 +523,7 @@ class Euclides:
                 self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED, PI*1.5))
                 self._onscreen.add(self._fire)
                 self._player.set_last_fire()
+                shot_sound.play()
 
             # check whether player's projectile hits an enemy
             self._hostile.hit_by(self._fire)
