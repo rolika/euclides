@@ -355,6 +355,9 @@ class OnScreen(sprite.RenderUpdates):
         super().__init__(*sprites)
         self.reset()
 
+        # setup sounds
+        self._enemy_damaged = mixer.Sound("wav/enemy_hull_damage.wav")
+
     @property
     def score(self) -> int:
         """For simplicity, score is calculated for every container, but only that of enemies will be evaulated."""
@@ -380,6 +383,7 @@ class OnScreen(sprite.RenderUpdates):
         projectile: wave of projectiles"""
         for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
             member.damage()
+            self._enemy_damaged.play()
             self._score += SCORE_HULL_DAMAGE * member.n
             if member.is_destroyed:
                 self._score += SCORE_DESTROY_ENEMY * member.n
