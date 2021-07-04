@@ -424,25 +424,25 @@ class Euclides:
         # setup sprite groups
         self._fire = OnScreen()  # container for player's projectiles
         self._hostile = OnScreen()  # container for enemy aircrafts
-
-        self._state = State.INTRO
         self._onscreen = OnScreen()  # container for sprites on screen
 
         self._main()
 
     def _main(self) -> None:
         """Execute the application."""
+        state = State.INTRO
+
         while True:
-            if self._state == State.INTRO:
-                self._state = self._intro()
+            if state == State.INTRO:
+                state = self._intro()
 
-            if self._state == State.PLAY:
-                self._state = self._play()
+            if state == State.PLAY:
+                state = self._play()
 
-            if self._state == State.GAME_OVER:
-                self._state = self._end()
+            if state == State.GAME_OVER:
+                state = self._end()
 
-            if self._state == State.QUIT:
+            if state == State.QUIT:
                 pygame.quit()
                 return
 
@@ -483,7 +483,7 @@ class Euclides:
                     return State.PLAY
 
             self._highscore.update(hiscore=self._hiscore)
-            changed = self._onscreen.update(screen=self._screen, state=self._state)
+            changed = self._onscreen.update(screen=self._screen, state=State.INTRO)
             pygame.display.update(changed)
 
     def _play(self):
@@ -543,7 +543,7 @@ class Euclides:
 
             # update sprites
             changed = self._onscreen.update(screen=self._screen,
-                                            state=self._state,
+                                            state=State.PLAY,
                                             score=self._hostile.score,
                                             hiscore=actual_hiscore)
             pygame.display.update(changed)
