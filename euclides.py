@@ -407,9 +407,6 @@ class Euclides:
         pygame.display.set_caption("Euclides")
         self._hiscore = self._load_hiscore()
 
-        # setup display
-        self._screen = pygame.display.set_mode(SCREEN_SIZE)
-
         # setup player
         self._player = Player()
 
@@ -430,17 +427,21 @@ class Euclides:
 
     def _main(self) -> None:
         """Execute the application."""
+        # setup display
+        screen = pygame.display.set_mode(SCREEN_SIZE)
+
+        #setup initial state
         state = State.INTRO
 
         while True:
             if state == State.INTRO:
-                state = self._intro()
+                state = self._intro(screen)
 
             if state == State.PLAY:
-                state = self._play()
+                state = self._play(screen)
 
             if state == State.GAME_OVER:
-                state = self._end()
+                state = self._end(screen)
 
             if state == State.QUIT:
                 pygame.quit()
@@ -465,13 +466,14 @@ class Euclides:
         else:
             return hiscore
 
-    def _intro(self):
-        """Show game title screen."""
+    def _intro(self, screen) -> State:
+        """Show game title screen.
+        screen: pygame display"""
         self._set(self._score, self._highscore, self._title, self._subtitle, self._player)
 
         while True:
             time.Clock().tick(FPS)
-            self._screen.fill(BLACK)
+            screen.fill(BLACK)
 
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
@@ -483,11 +485,12 @@ class Euclides:
                     return State.PLAY
 
             self._highscore.update(hiscore=self._hiscore)
-            changed = self._onscreen.update(screen=self._screen, state=State.INTRO)
+            changed = self._onscreen.update(screen=screen, state=State.INTRO)
             pygame.display.update(changed)
 
-    def _play(self):
-        """Play the game."""
+    def _play(self, screen) -> State:
+        """Play the game.
+        screen: pygame display"""
         self._set(self._score, self._highscore, self._player, self._fire, self._hostile)
 
         size = ENEMY_STARTING_SIZE
@@ -496,7 +499,7 @@ class Euclides:
 
         while True:
             time.Clock().tick(FPS)
-            self._screen.fill(BLACK)
+            screen.fill(BLACK)
 
             # listen for user actions
             for event in pygame.event.get():
@@ -542,14 +545,15 @@ class Euclides:
             actual_hiscore = self._get_hiscore(self._hostile.score, self._hiscore)
 
             # update sprites
-            changed = self._onscreen.update(screen=self._screen,
+            changed = self._onscreen.update(screen=screen,
                                             state=State.PLAY,
                                             score=self._hostile.score,
                                             hiscore=actual_hiscore)
             pygame.display.update(changed)
 
-    def _end(self):
-        """Show game over screen."""
+    def _end(self, screen) -> State:
+        """Show game over screen.
+        screen: pygame display"""
         score = self._hostile.score
         self._set(self._score, self._highscore, self._game_over)
         if self._is_new_hiscore(score, self._hiscore):
@@ -559,7 +563,7 @@ class Euclides:
 
         while True:
             time.Clock().tick(FPS)
-            self._screen.fill(BLACK)
+            screen.fill(BLACK)
 
             mouse_up = False
             for event in pygame.event.get():
@@ -571,7 +575,7 @@ class Euclides:
                 if event.type == MOUSEBUTTONUP and self._game_over.rect.collidepoint(mouse.get_pos()):
                     return State.INTRO
 
-            changed = self._onscreen.update(screen=self._screen,
+            changed = self._onscreen.update(screen=screen,
                                             score=score,
                                             hiscore=self._hiscore,
                                             mouse_pos=mouse.get_pos())
