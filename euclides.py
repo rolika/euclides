@@ -48,7 +48,7 @@ class State(enum.Enum):
     QUIT = enum.auto()
     INTRO = enum.auto()
     PLAY = enum.auto()
-    END = enum.auto()
+    GAME_OVER = enum.auto()
 
 
 class Trig:
@@ -285,7 +285,7 @@ class PlainText(sprite.Sprite):
 
 
 class Score(PlainText):
-    """Handle score as sprites."""
+    """Handle score as sprite."""
     def __init__(self, font_name, font_size, font_color, pos) -> None:
         """Initialize a sprite object.
         font_name:  name of font including its path as string
@@ -304,8 +304,8 @@ class Score(PlainText):
 
 
 class HiScore(Score):
-    """Handle hiscore as sprites."""
-    def __init__(self, font_name, font_size, hiscore, font_color, pos) -> None:
+    """Handle hiscore as sprite."""
+    def __init__(self, font_name, font_size, font_color, pos) -> None:
         """Initialize a sprite object.
         font_name:  name of font including its path as string
         font_size:  size in pixels
@@ -405,7 +405,7 @@ class Euclides:
         random.seed()
         pygame.init()
         pygame.display.set_caption("Euclides")
-        self._load_hiscore()
+        self._hiscore = self._load_hiscore()
 
         # setup display
         self._screen = pygame.display.set_mode(SCREEN_SIZE)
@@ -413,11 +413,11 @@ class Euclides:
         # setup player
         self._player = Player()
 
-        # setup scores
-        self._title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "euclides", WHITE, TITLE_POS)
+        # setup texts
+        self._title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "EUCLIDES", WHITE, TITLE_POS)
         self._subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
         self._score = Score("font/Monofett-Regular.ttf", 40, WHITE, SCORE_POS)
-        self._highscore = HiScore("font/Monofett-Regular.ttf", 40, str(self._hiscore), WHITE, HISCORE_POS)
+        self._highscore = HiScore("font/Monofett-Regular.ttf", 40, WHITE, HISCORE_POS)
         self._game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
         self._new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
 
@@ -434,33 +434,40 @@ class Euclides:
         """Execute the application."""
         while True:
             if self._state == State.INTRO:
-                self._onscreen.empty()
-                self._player.reset()
-                self._onscreen.add(self._score, self._highscore, self._title, self._subtitle, self._player)
                 self._state = self._intro()
 
             if self._state == State.PLAY:
-                self._onscreen.empty()
-                self._hostile.reset()
-                self._fire.reset()
-                self._onscreen.add(self._score, self._highscore, self._player, self._fire, self._hostile)
-                self._score.update(score=0)
                 self._state = self._play()
 
-            if self._state == State.END:
-                self._onscreen.empty()
-                self._onscreen.add(self._score, self._highscore, self._game_over)
-                if self._hostile.score > self._hiscore:
-                    self._onscreen.add(self._new_hiscore)
+            if self._state == State.GAME_OVER:
                 self._state = self._end()
 
             if self._state == State.QUIT:
-                self._exit()
+                pygame.quit()
                 return
+
+    def _set(self, *args) -> None:
+        """Set game screen, containers etc.
+        args:   screen elements (sprites, containers)"""
+        self._onscreen.reset()
+        self._player.reset()
+        self._fire.reset()
+        self._hostile.reset()
+        self._onscreen.add(*args)
+
+    def _is_new_hiscore(self, score, hiscore) -> bool:
+        """Return True if score is higher than the hi-score."""
+        return score > hiscore
+
+    def _get_hiscore(self, score, hiscore) -> int:
+        if self._is_new_hiscore(score, hiscore):
+            return score
+        else:
+            return hiscore
 
     def _intro(self):
         """Show game title screen."""
-        self._load_hiscore()
+        self._set(self._score, self._highscore, self._title, self._subtitle, self._player)
 
         while True:
             time.Clock().tick(FPS)
@@ -481,6 +488,8 @@ class Euclides:
 
     def _play(self):
         """Play the game."""
+        self._set(self._score, self._highscore, self._player, self._fire, self._hostile)
+
         size = ENEMY_STARTING_SIZE
         n = 3
         speed = ENEMY_STARTING_SPEED
@@ -527,10 +536,10 @@ class Euclides:
 
             # check if player is still alive
             if not self._player.alive():
-                return State.END
+                return State.GAME_OVER
 
             # update hiscore
-            actual_hiscore = self._hiscore if self._hostile.score <= self._hiscore else self._hostile.score
+            actual_hiscore = self._get_hiscore(self._hostile.score, self._hiscore)
 
             # update sprites
             changed = self._onscreen.update(screen=self._screen,
@@ -541,8 +550,12 @@ class Euclides:
 
     def _end(self):
         """Show game over screen."""
-        self._save_hiscore()
-        self._load_hiscore()
+        score = self._hostile.score
+        self._set(self._score, self._highscore, self._game_over)
+        if self._is_new_hiscore(score, self._hiscore):
+            self._onscreen.add(self._new_hiscore)
+            self._hiscore = score
+            self._save_hiscore(self._hiscore)
 
         while True:
             time.Clock().tick(FPS)
@@ -559,26 +572,21 @@ class Euclides:
                     return State.INTRO
 
             changed = self._onscreen.update(screen=self._screen,
-                                            score=self._hostile.score,
+                                            score=score,
                                             hiscore=self._hiscore,
                                             mouse_pos=mouse.get_pos())
             pygame.display.update(changed)
 
-    def _exit(self) -> None:
-        """Nicely exit the game."""
-        self._save_hiscore()
-        pygame.quit()
-
-    def _load_hiscore(self):
+    def _load_hiscore(self) -> int:
         """Load hi-score from persistent dictionary."""
         with shelve.open("hiscore") as hsc:
-            self._hiscore = hsc.get("hiscore", 0)
+            hiscore = hsc.get("hiscore", 0)
+        return hiscore
 
-    def _save_hiscore(self) -> None:
+    def _save_hiscore(self, hiscore) -> None:
         """Save hi-score to persistent dictionary."""
-        if self._hostile.score > self._hiscore:
-            with shelve.open("hiscore") as hsc:
-                hsc["hiscore"] = self._hostile.score
+        with shelve.open("hiscore") as hsc:
+            hsc["hiscore"] = hiscore
 
 
 if __name__ == "__main__":
