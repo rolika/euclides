@@ -405,18 +405,16 @@ class Euclides:
         random.seed()
         pygame.init()
         pygame.display.set_caption("Euclides")
+
+        # restore hi-score
         self._hiscore = self._load_hiscore()
 
         # setup player
         self._player = Player()
 
-        # setup texts
-        self._title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "EUCLIDES", WHITE, TITLE_POS)
-        self._subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
+        # setup scores
         self._score = Score("font/Monofett-Regular.ttf", 40, WHITE, SCORE_POS)
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, WHITE, HISCORE_POS)
-        self._game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
-        self._new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
 
         # setup sprite groups
         self._fire = OnScreen()  # container for player's projectiles
@@ -469,7 +467,9 @@ class Euclides:
     def _intro(self, screen) -> State:
         """Show game title screen.
         screen: pygame display"""
-        self._set(self._score, self._highscore, self._title, self._subtitle, self._player)
+        title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "EUCLIDES", WHITE, TITLE_POS)
+        subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
+        self._set(self._score, self._highscore, title, subtitle, self._player)
 
         while True:
             time.Clock().tick(FPS)
@@ -554,10 +554,12 @@ class Euclides:
     def _end(self, screen) -> State:
         """Show game over screen.
         screen: pygame display"""
+        game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
+        new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
         score = self._hostile.score
-        self._set(self._score, self._highscore, self._game_over)
+        self._set(self._score, self._highscore, game_over)
         if self._is_new_hiscore(score, self._hiscore):
-            self._onscreen.add(self._new_hiscore)
+            self._onscreen.add(new_hiscore)
             self._hiscore = score
             self._save_hiscore(self._hiscore)
 
@@ -572,7 +574,7 @@ class Euclides:
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
-                if event.type == MOUSEBUTTONUP and self._game_over.rect.collidepoint(mouse.get_pos()):
+                if event.type == MOUSEBUTTONUP and game_over.rect.collidepoint(mouse.get_pos()):
                     return State.INTRO
 
             changed = self._onscreen.update(screen=screen,
