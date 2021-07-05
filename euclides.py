@@ -111,6 +111,8 @@ class Spaceship(Polygon):
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
+        if self.is_destroyed:
+            self.kill()
 
     @property
     def is_destroyed(self) -> bool:
@@ -367,10 +369,6 @@ class OnScreen(sprite.RenderUpdates):
     def update(self, *args, **kwargs) -> None:
         """Handle sprites within the group.
         screen: game's display Surface"""
-        # for member in self.sprites():
-        #     # getattr is needed, because only player and enemies have the is_destroyed() method.
-        #     if getattr(member, "is_destroyed", None):
-        #         member.kill()  # remove from group
         screen = kwargs.pop("screen", None)
         assert screen
         changed = self.draw(screen)
@@ -388,7 +386,6 @@ class OnScreen(sprite.RenderUpdates):
             self._score += SCORE_HULL_DAMAGE * member.n
             if member.is_destroyed:
                 self._score += SCORE_DESTROY_ENEMY * member.n
-                member.kill()  # remove from group
 
     def contact(self, player:sprite.Sprite):
         """Detect collision between player and enemy polygons and reduce their hull.
@@ -411,7 +408,7 @@ class Euclides:
         # initialize game objects
         random.seed()
         pygame.init()
-        mixer.set_num_channels(32)  # continous fire alone needs 20
+        mixer.set_num_channels(64)  # continous fire alone needs 20
         pygame.display.set_caption("Euclides")
 
         # restore hi-score
