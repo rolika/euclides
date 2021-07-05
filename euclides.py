@@ -357,6 +357,7 @@ class OnScreen(sprite.RenderUpdates):
 
         # setup sounds
         self._enemy_damaged = mixer.Sound("wav/enemy_hull_damage.wav")
+        self._enemy_damaged.set_volume(0.6)
 
     @property
     def score(self) -> int:
@@ -366,10 +367,10 @@ class OnScreen(sprite.RenderUpdates):
     def update(self, *args, **kwargs) -> None:
         """Handle sprites within the group.
         screen: game's display Surface"""
-        for member in self.sprites():
-            # getattr is needed, because only player and enemies have the is_destroyed() method.
-            if getattr(member, "is_destroyed", None):
-                member.kill()  # remove from group
+        # for member in self.sprites():
+        #     # getattr is needed, because only player and enemies have the is_destroyed() method.
+        #     if getattr(member, "is_destroyed", None):
+        #         member.kill()  # remove from group
         screen = kwargs.pop("screen", None)
         assert screen
         changed = self.draw(screen)
@@ -395,6 +396,7 @@ class OnScreen(sprite.RenderUpdates):
         for enemy in sprite.spritecollide(player, self, False, sprite.collide_circle):
             player.knockback(enemy)
             enemy.damage()
+            self._enemy_damaged.play()
             player.damage()
 
     def reset(self):
@@ -409,7 +411,7 @@ class Euclides:
         # initialize game objects
         random.seed()
         pygame.init()
-        mixer.set_num_channels(128)  # needed because of the continous fire
+        mixer.set_num_channels(32)  # continous fire alone needs 20
         pygame.display.set_caption("Euclides")
 
         # restore hi-score
@@ -451,7 +453,7 @@ class Euclides:
                 pygame.quit()
                 return
 
-    def _set(self, *args) -> None:
+    def _set_screen(self, *args) -> None:
         """Set game screen, containers etc.
         args:   screen elements (sprites, containers)"""
         self._onscreen.reset()
@@ -475,7 +477,7 @@ class Euclides:
         screen: pygame display"""
         title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "EUCLIDES", WHITE, TITLE_POS)
         subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
-        self._set(self._score, self._highscore, title, subtitle, self._player)
+        self._set_screen(self._score, self._highscore, title, subtitle, self._player)
 
         while True:
             time.Clock().tick(FPS)
@@ -497,7 +499,7 @@ class Euclides:
     def _play(self, screen) -> State:
         """Play the game.
         screen: pygame display"""
-        self._set(self._score, self._highscore, self._player, self._fire, self._hostile)
+        self._set_screen(self._score, self._highscore, self._player, self._fire, self._hostile)
 
         size = ENEMY_STARTING_SIZE
         n = 3
@@ -505,6 +507,7 @@ class Euclides:
 
         # setup sounds
         shot_sound = mixer.Sound("wav/gunshot.wav")
+        shot_sound.set_volume(0.3)
 
         while True:
             time.Clock().tick(FPS)
@@ -567,7 +570,7 @@ class Euclides:
         game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
         new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
         score = self._hostile.score
-        self._set(self._score, self._highscore, game_over)
+        self._set_screen(self._score, self._highscore, game_over)
         if self._is_new_hiscore(score, self._hiscore):
             self._onscreen.add(new_hiscore)
             self._hiscore = score
