@@ -108,10 +108,15 @@ class Spaceship(Polygon):
         super().__init__(size, n, pos)
         self._hull = n
 
+        # setup sound
+        self._ship_destroyed = mixer.Sound("wav/explosion.wav")
+        self._ship_destroyed.set_volume(1)
+
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
         if self.is_destroyed:
+            self._ship_destroyed.play()
             self.kill()
 
     @property
@@ -357,9 +362,9 @@ class OnScreen(sprite.RenderUpdates):
         super().__init__(*sprites)
         self.reset()
 
-        # setup sounds
+        # setup sound
         self._enemy_damaged = mixer.Sound("wav/enemy_hull_damage.wav")
-        self._enemy_damaged.set_volume(0.6)
+        self._enemy_damaged.set_volume(0.5)
 
     @property
     def score(self) -> int:
@@ -504,7 +509,7 @@ class Euclides:
 
         # setup sounds
         shot_sound = mixer.Sound("wav/gunshot.wav")
-        shot_sound.set_volume(0.3)
+        shot_sound.set_volume(0.25)
 
         while True:
             time.Clock().tick(FPS)
