@@ -108,15 +108,12 @@ class Spaceship(Polygon):
         super().__init__(size, n, pos)
         self._hull = n
 
-        # setup sound
-        self._ship_destroyed = mixer.Sound("wav/explosion.wav")
-        self._ship_destroyed.set_volume(1)
-
-    def damage(self) -> None:
+    def damage(self, damage_sound:mixer.Sound, destroyed_sound: mixer.Sound) -> None:
         """Reduce hull by one."""
         self._hull -= 1
+        damage_sound.play()
         if self.is_destroyed:
-            self._ship_destroyed.play()
+            destroyed_sound.play()
             self.kill()
 
     @property
@@ -362,9 +359,11 @@ class OnScreen(sprite.RenderUpdates):
         super().__init__(*sprites)
         self.reset()
 
-        # setup sound
-        self._enemy_damaged = mixer.Sound("wav/enemy_hull_damage.wav")
-        self._enemy_damaged.set_volume(0.5)
+        # setup sounds
+        self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
+        self._ship_damage_sound.set_volume(0.5)
+        self._ship_destroyed_sound = mixer.Sound("wav/explosion.wav")
+        self._ship_destroyed_sound.set_volume(1)
 
     @property
     def score(self) -> int:
@@ -386,8 +385,7 @@ class OnScreen(sprite.RenderUpdates):
         Colliding projectiles get killed off (dokill2=True).
         projectile: wave of projectiles"""
         for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
-            member.damage()
-            self._enemy_damaged.play()
+            member.damage(self._ship_damage_sound, self._ship_destroyed_sound)
             self._score += SCORE_HULL_DAMAGE * member.n
             if member.is_destroyed:
                 self._score += SCORE_DESTROY_ENEMY * member.n
@@ -397,9 +395,8 @@ class OnScreen(sprite.RenderUpdates):
         player:     player sprite"""
         for enemy in sprite.spritecollide(player, self, False, sprite.collide_circle):
             player.knockback(enemy)
-            enemy.damage()
-            self._enemy_damaged.play()
-            player.damage()
+            enemy.damage(self._ship_damage_sound, self._ship_destroyed_sound)
+            player.damage(self._ship_damage_sound, self._ship_destroyed_sound)
 
     def reset(self):
         """When player restarts the game."""
