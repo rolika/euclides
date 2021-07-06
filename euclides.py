@@ -108,12 +108,18 @@ class Spaceship(Polygon):
         super().__init__(size, n, pos)
         self._hull = n
 
-    def damage(self, damage_sound:mixer.Sound, destroyed_sound: mixer.Sound) -> None:
+        # setup sounds
+        self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
+        self._ship_damage_sound.set_volume(0.5)
+        self._ship_destroyed_sound = mixer.Sound("wav/explosion.wav")
+        self._ship_destroyed_sound.set_volume(1)
+
+    def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
-        damage_sound.play()
+        self._ship_damage_sound.play()
         if self.is_destroyed:
-            destroyed_sound.play()
+            self._ship_destroyed_sound.play()
             self.kill()
 
     @property
@@ -369,48 +375,53 @@ class OnScreen(sprite.RenderUpdates):
 
 
 class Wave(OnScreen):
-    """Sprite container for enemies and projectiles."""
-    def __init__(self, *sprites:Polygon) -> None:
+    """Sprite container for enemies."""
+    def __init__(self, *sprites:Enemy) -> None:
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
-
-        # setup sounds
-        self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
-        self._ship_damage_sound.set_volume(0.5)
-        self._ship_destroyed_sound = mixer.Sound("wav/explosion.wav")
-        self._ship_destroyed_sound.set_volume(1)
-
         self.reset()
 
     @property
     def score(self) -> int:
         """Return the waves calculated score."""
         return self._score
-
-    def hit_by(self, projectiles:sprite.RenderUpdates) -> None:
-        """Detect collision between projectiles and their spaceship target.
-        This method should be called on the enemy instance with projectiles as argument.
-        Colliding projectiles get killed off (dokill2=True).
-        projectile: wave of projectiles"""
-        for member in sprite.groupcollide(self, projectiles, False, True, sprite.collide_circle):
-            member.damage(self._ship_damage_sound, self._ship_destroyed_sound)
-            self._score += SCORE_HULL_DAMAGE * member.n
-            if member.is_destroyed:
-                self._score += SCORE_DESTROY_ENEMY * member.n
+    
+    def increase_score(self, value:int) -> None:
+        """Increase enemy wave's score.
+        value:  damaged or destoryed score increment"""
+        self._score += value
 
     def contact(self, player:sprite.Sprite):
         """Detect collision between player and enemy polygons and reduce their hull.
         player:     player sprite"""
         for enemy in sprite.spritecollide(player, self, False, sprite.collide_circle):
             player.knockback(enemy)
-            enemy.damage(self._ship_damage_sound, self._ship_destroyed_sound)
-            player.damage(self._ship_damage_sound, self._ship_destroyed_sound)
+            enemy.damage()
+            player.damage()
 
     def reset(self):
         """When player restarts the game."""
         self._score = 0
         self.empty()
+
+
+class Storm(OnScreen):
+    """Sprite container for projectiles."""
+    def __init__(self, *sprites:Enemy) -> None:
+        """Uses default initialization.
+        sprites:    any number of sprite objects"""
+        super().__init__(*sprites)
+
+    def hit(self, enemies:Wave) -> None:
+        """Detect collision between projectiles and enemies.
+        Colliding projectiles get killed off (dokill2=True).
+        spaceship:  enemies"""
+        for member in sprite.groupcollide(enemies, self, False, True, sprite.collide_circle):
+            member.damage()
+            enemies.increase_score(SCORE_HULL_DAMAGE * member.n)
+            if member.is_destroyed:
+                enemies.increase_score(SCORE_DESTROY_ENEMY * member.n)
 
 
 class Euclides:
@@ -433,8 +444,8 @@ class Euclides:
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, WHITE, HISCORE_POS)
 
         # setup sprite groups
-        self._fire = Wave()  # container for player's projectiles
-        self._hostile = Wave()  # container for enemy aircrafts
+        self._fire = Storm()  # container for player's projectiles
+        self._hostile = Wave()  # container for enemy spacecrafts
         self._onscreen = OnScreen()  # container for sprites on screen
 
         self._main()
@@ -466,7 +477,7 @@ class Euclides:
         args:   screen elements (sprites, containers)"""
         self._onscreen.empty()
         self._player.reset()
-        self._fire.reset()
+        self._fire.empty()
         self._hostile.reset()
         self._onscreen.add(*args)
 
@@ -553,7 +564,7 @@ class Euclides:
                 shot_sound.play()
 
             # check whether player's projectile hits an enemy
-            self._hostile.hit_by(self._fire)
+            self._fire.hit(self._hostile)
 
             # check player collisions with enemy craft
             self._hostile.contact(self._player)
