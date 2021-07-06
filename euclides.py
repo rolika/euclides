@@ -357,18 +357,6 @@ class OnScreen(sprite.RenderUpdates):
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
-        self.reset()
-
-        # setup sounds
-        self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
-        self._ship_damage_sound.set_volume(0.5)
-        self._ship_destroyed_sound = mixer.Sound("wav/explosion.wav")
-        self._ship_destroyed_sound.set_volume(1)
-
-    @property
-    def score(self) -> int:
-        """For simplicity, score is calculated for every container, but only that of enemies will be evaulated."""
-        return self._score
 
     def update(self, *args, **kwargs) -> None:
         """Handle sprites within the group.
@@ -378,6 +366,27 @@ class OnScreen(sprite.RenderUpdates):
         changed = self.draw(screen)
         super().update(*args, **kwargs)
         return changed
+
+
+class Wave(OnScreen):
+    """Sprite container for enemies and projectiles."""
+    def __init__(self, *sprites:Polygon) -> None:
+        """Uses default initialization.
+        sprites:    any number of sprite objects"""
+        super().__init__(*sprites)
+
+        # setup sounds
+        self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
+        self._ship_damage_sound.set_volume(0.5)
+        self._ship_destroyed_sound = mixer.Sound("wav/explosion.wav")
+        self._ship_destroyed_sound.set_volume(1)
+
+        self.reset()
+
+    @property
+    def score(self) -> int:
+        """Return the waves calculated score."""
+        return self._score
 
     def hit_by(self, projectiles:sprite.RenderUpdates) -> None:
         """Detect collision between projectiles and their spaceship target.
@@ -424,8 +433,8 @@ class Euclides:
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, WHITE, HISCORE_POS)
 
         # setup sprite groups
-        self._fire = OnScreen()  # container for player's projectiles
-        self._hostile = OnScreen()  # container for enemy aircrafts
+        self._fire = Wave()  # container for player's projectiles
+        self._hostile = Wave()  # container for enemy aircrafts
         self._onscreen = OnScreen()  # container for sprites on screen
 
         self._main()
@@ -455,7 +464,7 @@ class Euclides:
     def _set_screen(self, *args) -> None:
         """Set game screen, containers etc.
         args:   screen elements (sprites, containers)"""
-        self._onscreen.reset()
+        self._onscreen.empty()
         self._player.reset()
         self._fire.reset()
         self._hostile.reset()
