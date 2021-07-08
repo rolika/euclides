@@ -9,6 +9,7 @@ import math
 import random
 import shelve
 import enum
+import bisect
 
 
 PI = math.pi
@@ -42,6 +43,12 @@ SUBTITLE_POS = (400, 350)
 
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
+
+# constants relating to the hall of fames
+HOF_FILE = "hiscores"  # .db extension added by shelve
+HOF_CHART = 10  # number of entries in the hall of fames
+HOF_DEFAULT_NAME = "ROLI"
+HOF_DEFAULT_SCORE = 1000
 
 
 class State(enum.Enum):
@@ -386,7 +393,7 @@ class Wave(OnScreen):
     def score(self) -> int:
         """Return the waves calculated score."""
         return self._score
-    
+
     def increase_score(self, value:int) -> None:
         """Increase enemy wave's score.
         value:  damaged or destoryed score increment"""
@@ -424,6 +431,72 @@ class Storm(OnScreen):
                 enemies.increase_score(SCORE_DESTROY_ENEMY * member.n)
 
 
+class Pilot:
+    """Entry for the hall of fames."""
+    def __init__(self, name, score):
+        self._name = name.upper()[:4]  # all names 4 uppercased characters
+        self._score = score
+
+    def __str__(self):
+        """Return a formatted representation of the entry."""
+        return "{name}: {score:07}".format(name=self._name, score=self._score)
+
+    def __lt__(self, other):
+        """Rich comparison for bisecting.
+        other:  other Pilot"""
+        return self._score < other.score
+
+    @property
+    def score(self) -> int:
+        """Return score value."""
+        return self._score
+
+
+class HallOfFame:
+    """The hall of fame contains the best hi-scores."""
+    def __init__(self, filename:str) -> None:
+        """Initialize the hall of fame.
+        filename:       path to shelve file"""
+        self._filename = filename
+        self._hof = []  # list of Pilots
+    
+    def __str__(self):
+        """Return the string representation, each entry in a new line."""
+        return "\n".join(map(lambda entry: str(entry), self._hof))
+
+    def restore(self) -> None:
+        """Restore hall of fame from shelve."""
+        with shelve.open(self._filename) as hof:
+            for i in range(HOF_CHART):
+                entry = hof.get(str(i), None)
+                if entry is None:
+                    self._hof.append(Pilot(HOF_DEFAULT_NAME, HOF_DEFAULT_SCORE))
+                else:
+                    self._hof.append(entry)
+
+    def save(self) -> None:
+        """Write hall of fame to shelve."""
+        with shelve.open(self._filename) as hof:
+            for i in range(HOF_CHART):
+                hof[str(i)] = self._hof[i]
+
+    def insert(self, entry:Pilot) -> None:
+        """Insert a new entry into the hall of fame.
+        entry:  Pilot object"""
+        bisect.insort_right(self._hof, entry)
+        self._hof = self._hof[:HOF_CHART]
+
+    def is_new_hiscore(self, score:int) -> bool:
+        """Return True if this is a new hi-score.
+        score:  score to compare"""
+        return score > self._hof[0].score
+
+    def is_eligible(self, score:int) -> bool:
+        """Return True if this score is eligible to enter the hall of fame.
+        score:  score to compare"""
+        return score > self._hof[HOF_CHART-1].score
+
+
 class Euclides:
     """Main game application."""
     def __init__(self) -> None:
@@ -435,6 +508,9 @@ class Euclides:
 
         # restore hi-score
         self._hiscore = self._load_hiscore()
+        self._hall_of_fame = HallOfFame(HOF_FILE)
+        self._hall_of_fame.restore()
+        print(self._hall_of_fame)
 
         # setup player
         self._player = Player()
