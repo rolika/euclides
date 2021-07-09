@@ -45,7 +45,7 @@ SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
 
 # constants relating to the hall of fames
-HOF_FILE = "hiscores"  # .db extension added by shelve
+HOF_FILE = "halloffame"  # .db extension added by shelve
 HOF_CHART = 10  # number of entries in the hall of fames
 HOF_DEFAULT_NAME = "ROLI"
 HOF_DEFAULT_SCORE = 1000
@@ -459,10 +459,15 @@ class HallOfFame:
         filename:       path to shelve file"""
         self._filename = filename
         self._hof = []  # list of Pilots
-    
+
     def __str__(self):
         """Return the string representation, each entry in a new line."""
-        return "\n".join(map(lambda entry: str(entry), self._hof))
+        return "\n".join(map(str, self._hof[::-1]))
+
+    @property
+    def hiscore(self) -> int:
+        """Return the actual hiscore."""
+        return self._hof[HOF_CHART-1].score
 
     def restore(self) -> None:
         """Restore hall of fame from shelve."""
@@ -474,27 +479,28 @@ class HallOfFame:
                 else:
                     self._hof.append(entry)
 
-    def save(self) -> None:
-        """Write hall of fame to shelve."""
-        with shelve.open(self._filename) as hof:
-            for i in range(HOF_CHART):
-                hof[str(i)] = self._hof[i]
-
     def insert(self, entry:Pilot) -> None:
         """Insert a new entry into the hall of fame.
         entry:  Pilot object"""
-        bisect.insort_right(self._hof, entry)
-        self._hof = self._hof[:HOF_CHART]
+        bisect.insort_left(self._hof, entry)
+        self._hof = self._hof[1:HOF_CHART+1]  # always get rid of the lowest value after insertion
+        self._save()
 
     def is_new_hiscore(self, score:int) -> bool:
         """Return True if this is a new hi-score.
         score:  score to compare"""
-        return score > self._hof[0].score
+        return score > self.hiscore
 
     def is_eligible(self, score:int) -> bool:
         """Return True if this score is eligible to enter the hall of fame.
         score:  score to compare"""
-        return score > self._hof[HOF_CHART-1].score
+        return score > self._hof[0].score
+
+    def _save(self) -> None:
+        """Write hall of fame to shelve."""
+        with shelve.open(self._filename) as hof:
+            for i in range(HOF_CHART):
+                hof[str(i)] = self._hof[i]
 
 
 class Euclides:
@@ -506,10 +512,10 @@ class Euclides:
         mixer.set_num_channels(64)  # continous fire alone needs 20
         pygame.display.set_caption("Euclides")
 
-        # restore hi-score
-        self._hiscore = self._load_hiscore()
+        # restore hall of fame
         self._hall_of_fame = HallOfFame(HOF_FILE)
         self._hall_of_fame.restore()
+        self._hiscore = self._hall_of_fame.hiscore
         print(self._hall_of_fame)
 
         # setup player
@@ -665,11 +671,12 @@ class Euclides:
         game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
         new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
         score = self._hostile.score
+        self._hall_of_fame.insert(Pilot("Anon", score))
+        print("\n", self._hall_of_fame)
         self._set_screen(self._score, self._highscore, game_over)
         if self._is_new_hiscore(score, self._hiscore):
             self._onscreen.add(new_hiscore)
             self._hiscore = score
-            self._save_hiscore(self._hiscore)
 
         while True:
             time.Clock().tick(FPS)
@@ -690,17 +697,6 @@ class Euclides:
                                             hiscore=self._hiscore,
                                             mouse_pos=mouse.get_pos())
             pygame.display.update(changed)
-
-    def _load_hiscore(self) -> int:
-        """Load hi-score from persistent dictionary."""
-        with shelve.open("hiscore") as hsc:
-            hiscore = hsc.get("hiscore", 0)
-        return hiscore
-
-    def _save_hiscore(self, hiscore) -> None:
-        """Save hi-score to persistent dictionary."""
-        with shelve.open("hiscore") as hsc:
-            hsc["hiscore"] = hiscore
 
 
 if __name__ == "__main__":
