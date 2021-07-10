@@ -440,7 +440,7 @@ class Pilot:
 
     def __str__(self):
         """Return a formatted representation of the entry."""
-        return "{name}: {score:07}".format(name=self._name, score=self._score)
+        return "{name:.<10}{score:07}".format(name=self._name, score=self._score)
 
     def __lt__(self, other):
         """Rich comparison for bisecting.
