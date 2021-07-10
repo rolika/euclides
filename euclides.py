@@ -713,10 +713,10 @@ class Euclides:
         self._set_screen(self._score, self._highscore, game_over)
         text = None
         if self._hall_of_fame.is_new_hiscore(score):
-            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, NEWHI_POS)
+            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "A new hi-score!", WHITE, NEWHI_POS)
             self._hiscore = score
         elif self._hall_of_fame.is_eligible(score):
-            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "You've made it to the hall of fame!", WHITE, NEWHI_POS)
+            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "A new entry to the hall of fame!", WHITE, NEWHI_POS)
         if text:
             self._onscreen.add(text)
 
