@@ -517,6 +517,8 @@ class HallOfFame:
 class NameEntryDialog(Frame):
     """Tkinter dialog box to enter a name."""
     def __init__(self, parent=None) -> None:
+        """Init wiht a parent widget.
+        parent: widget"""
         super().__init__(parent, bg="black")
         self.master.title("Euclides")
         self._pilot_name = StringVar()
@@ -739,6 +741,8 @@ class Euclides:
             pygame.display.update(changed)
 
     def _enter_name(self, score):
+        """Enter a name and save to database.
+        score:  player's last score"""
         tk_root = tkinter.Tk()
         entry = NameEntryDialog(tk_root)
         tk_root.mainloop()
