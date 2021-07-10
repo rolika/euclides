@@ -1,3 +1,4 @@
+import tkinter
 import pygame
 from pygame import sprite
 from pygame import time
@@ -10,6 +11,9 @@ import random
 import shelve
 import enum
 import bisect
+from tkinter import *
+from tkinter import messagebox
+
 
 
 PI = math.pi
@@ -510,6 +514,45 @@ class HallOfFame:
                 hof[str(i)] = self._hof[i]
 
 
+class NameEntryDialog(Frame):
+    """Tkinter dialog box to enter a name."""
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent, bg="black")
+        self.master.title("Euclides")
+        self._pilot_name = StringVar()
+        self._validated_name = HOF_DEFAULT_NAME
+        self.body()
+        self.pack()
+
+    @property
+    def pilot_name(self):
+        """Return the entered name."""
+        return self._validated_name
+
+    def body(self):
+        """Display the dialog."""
+        Label(self, text="Enter your name, Pilot!", bg="black", fg="white").pack()
+        entry = Entry(self, textvariable=self._pilot_name, width=30, bg="black", fg="white")
+        entry.bind("<KeyPress-KP_Enter>", self.apply)
+        entry.bind("<KeyPress-Return>", self.apply)
+        entry.pack()
+        Button(self, text="OK", width=12, command=self.apply, bg="black", fg="white").pack(side=LEFT)
+        Button(self, text="Cancel", width=12, command=self.quit, bg="black", fg="white").pack()
+        entry.focus_set()
+
+    def validate(self):
+        """Validate user's entry."""
+        name = self._pilot_name.get().upper()[:4]
+        if name:
+            self._validated_name = name
+        return messagebox.askokcancel("Are you sure?", "{} will be shown.".format(self._validated_name), parent=self)
+
+    def apply(self, event=None):
+        """Validate and quit."""
+        if self.validate():
+            self.quit()
+
+
 class Euclides:
     """Main game application."""
     def __init__(self) -> None:
@@ -591,7 +634,7 @@ class Euclides:
                         return State.QUIT
                 if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(mouse.get_pos()):
                     return State.PLAY
-                    
+
             changed = self._onscreen.update(screen=screen, state=State.INTRO, hiscore=self._hiscore)
             pygame.display.update(changed)
 
@@ -666,16 +709,18 @@ class Euclides:
         game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS, State.INTRO)
         score = self._hostile.score
         self._set_screen(self._score, self._highscore, game_over)
+        text = None
         if self._hall_of_fame.is_new_hiscore(score):
-            new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, NEWHI_POS)
-            self._onscreen.add(new_hiscore)
+            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, NEWHI_POS)
             self._hiscore = score
-        self._hall_of_fame.insert(Pilot("Anon", score))
+        elif self._hall_of_fame.is_eligible(score):
+            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "You've made it to the hall of fame!", WHITE, NEWHI_POS)
+        if text:
+            self._onscreen.add(text)
 
         while True:
             screen.fill(BLACK)
 
-            mouse_up = False
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
                     return State.QUIT
@@ -683,6 +728,8 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
                 if event.type == MOUSEBUTTONUP and game_over.rect.collidepoint(mouse.get_pos()):
+                    if text:
+                        self._enter_name(score)
                     return State.INTRO
 
             changed = self._onscreen.update(screen=screen,
@@ -690,6 +737,13 @@ class Euclides:
                                             hiscore=self._hiscore,
                                             mouse_pos=mouse.get_pos())
             pygame.display.update(changed)
+
+    def _enter_name(self, score):
+        tk_root = tkinter.Tk()
+        entry = NameEntryDialog(tk_root)
+        tk_root.mainloop()
+        tk_root.destroy()
+        self._hall_of_fame.insert(Pilot(entry.pilot_name, score))
 
 
 if __name__ == "__main__":
