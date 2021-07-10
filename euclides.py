@@ -24,7 +24,7 @@ FPS = 60
 
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
-PLAYER_START_POS = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
+PLAYER_START_POS = (SCREEN_WIDTH//2, SCREEN_HEIGHT-80)
 PLAYER_PROJECTILE_SPEED = 15
 WEAPON_COOLDOWN = 50  # player can fire at this rate (milliseconds)
 
@@ -38,13 +38,14 @@ ENEMY_PROJECTILE_SPEED_INCREMENT = 1
 
 SCORE_POS = (160, 10)
 HISCORE_POS = (610, 10)
-TITLE_POS = (400, 300)
-SUBTITLE_POS = (400, 350)
+TITLE_POS = (400, 150)
+SUBTITLE_POS = (400, 200)
+GAME_OVER_POS = (400, 300)
+FAME_POS = (400, 280)
 
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
 
-# constants relating to the hall of fames
 HOF_FILE = "halloffame"  # .db extension added by shelve
 HOF_CHART = 10  # number of entries in the hall of fames
 HOF_DEFAULT_NAME = "ROLI"
@@ -465,6 +466,11 @@ class HallOfFame:
         return "\n".join(map(str, self._hof[::-1]))
 
     @property
+    def hof(self):
+        """Return the hall of fame as an iterable in reversed order."""
+        return self._hof[::-1]
+
+    @property
     def hiscore(self) -> int:
         """Return the actual hiscore."""
         return self._hof[HOF_CHART-1].score
@@ -516,7 +522,6 @@ class Euclides:
         self._hall_of_fame = HallOfFame(HOF_FILE)
         self._hall_of_fame.restore()
         self._hiscore = self._hall_of_fame.hiscore
-        print(self._hall_of_fame)
 
         # setup player
         self._player = Player()
@@ -578,7 +583,11 @@ class Euclides:
         screen: pygame display"""
         title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "EUCLIDES", WHITE, TITLE_POS)
         subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
-        self._set_screen(self._score, self._highscore, title, subtitle, self._player)
+        fame = PlainText("font/ShareTechMono-Regular.ttf", 24, "Hall of Fame", WHITE, FAME_POS)
+        hall = OnScreen()
+        for i, entry in enumerate(self._hall_of_fame.hof):
+            hall.add(PlainText("font/ShareTechMono-Regular.ttf", 18, str(entry), WHITE, (400, 320+i*18)))
+        self._set_screen(self._score, self._highscore, title, subtitle, fame, hall, self._player)
 
         while True:
             time.Clock().tick(FPS)
@@ -668,11 +677,10 @@ class Euclides:
     def _end(self, screen) -> State:
         """Show game over screen.
         screen: pygame display"""
-        game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
+        game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS, State.INTRO)
         new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
         score = self._hostile.score
         self._hall_of_fame.insert(Pilot("Anon", score))
-        print("\n", self._hall_of_fame)
         self._set_screen(self._score, self._highscore, game_over)
         if self._is_new_hiscore(score, self._hiscore):
             self._onscreen.add(new_hiscore)
