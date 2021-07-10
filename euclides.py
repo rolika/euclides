@@ -41,6 +41,7 @@ HISCORE_POS = (610, 10)
 TITLE_POS = (400, 150)
 SUBTITLE_POS = (400, 200)
 GAME_OVER_POS = (400, 300)
+NEWHI_POS = (400, 350)
 FAME_POS = (400, 280)
 
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
@@ -568,16 +569,6 @@ class Euclides:
         self._hostile.reset()
         self._onscreen.add(*args)
 
-    def _is_new_hiscore(self, score, hiscore) -> bool:
-        """Return True if score is higher than the hi-score."""
-        return score > hiscore
-
-    def _get_hiscore(self, score, hiscore) -> int:
-        if self._is_new_hiscore(score, hiscore):
-            return score
-        else:
-            return hiscore
-
     def _intro(self, screen) -> State:
         """Show game title screen.
         screen: pygame display"""
@@ -590,7 +581,6 @@ class Euclides:
         self._set_screen(self._score, self._highscore, title, subtitle, fame, hall, self._player)
 
         while True:
-            time.Clock().tick(FPS)
             screen.fill(BLACK)
 
             for event in pygame.event.get():
@@ -601,9 +591,8 @@ class Euclides:
                         return State.QUIT
                 if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(mouse.get_pos()):
                     return State.PLAY
-
-            self._highscore.update(hiscore=self._hiscore)
-            changed = self._onscreen.update(screen=screen, state=State.INTRO)
+                    
+            changed = self._onscreen.update(screen=screen, state=State.INTRO, hiscore=self._hiscore)
             pygame.display.update(changed)
 
     def _play(self, screen) -> State:
@@ -664,30 +653,26 @@ class Euclides:
             if not self._player.alive():
                 return State.GAME_OVER
 
-            # update hiscore
-            actual_hiscore = self._get_hiscore(self._hostile.score, self._hiscore)
-
             # update sprites
             changed = self._onscreen.update(screen=screen,
                                             state=State.PLAY,
                                             score=self._hostile.score,
-                                            hiscore=actual_hiscore)
+                                            hiscore=max(self._hostile.score, self._hiscore))
             pygame.display.update(changed)
 
     def _end(self, screen) -> State:
         """Show game over screen.
         screen: pygame display"""
         game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS, State.INTRO)
-        new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
         score = self._hostile.score
-        self._hall_of_fame.insert(Pilot("Anon", score))
         self._set_screen(self._score, self._highscore, game_over)
-        if self._is_new_hiscore(score, self._hiscore):
+        if self._hall_of_fame.is_new_hiscore(score):
+            new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, NEWHI_POS)
             self._onscreen.add(new_hiscore)
             self._hiscore = score
+        self._hall_of_fame.insert(Pilot("Anon", score))
 
         while True:
-            time.Clock().tick(FPS)
             screen.fill(BLACK)
 
             mouse_up = False
