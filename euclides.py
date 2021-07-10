@@ -1,3 +1,4 @@
+import tkinter
 import pygame
 from pygame import sprite
 from pygame import time
@@ -9,6 +10,10 @@ import math
 import random
 import shelve
 import enum
+import bisect
+from tkinter import *
+from tkinter import messagebox
+
 
 
 PI = math.pi
@@ -23,7 +28,7 @@ FPS = 60
 
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
-PLAYER_START_POS = (SCREEN_WIDTH//2, SCREEN_HEIGHT-100)
+PLAYER_START_POS = (SCREEN_WIDTH//2, SCREEN_HEIGHT-80)
 PLAYER_PROJECTILE_SPEED = 15
 WEAPON_COOLDOWN = 50  # player can fire at this rate (milliseconds)
 
@@ -37,11 +42,19 @@ ENEMY_PROJECTILE_SPEED_INCREMENT = 1
 
 SCORE_POS = (160, 10)
 HISCORE_POS = (610, 10)
-TITLE_POS = (400, 300)
-SUBTITLE_POS = (400, 350)
+TITLE_POS = (400, 150)
+SUBTITLE_POS = (400, 200)
+GAME_OVER_POS = (400, 300)
+NEWHI_POS = (400, 350)
+FAME_POS = (400, 280)
 
 SCORE_HULL_DAMAGE = 10  # multiplied by vertices of the enemy
 SCORE_DESTROY_ENEMY = 100  # multiplied by vertices of the enemy
+
+HOF_FILE = "halloffame"  # .db extension added by shelve
+HOF_CHART = 10  # number of entries in the hall of fames
+HOF_DEFAULT_NAME = "ROLI"
+HOF_DEFAULT_SCORE = 1000
 
 
 class State(enum.Enum):
@@ -386,7 +399,7 @@ class Wave(OnScreen):
     def score(self) -> int:
         """Return the waves calculated score."""
         return self._score
-    
+
     def increase_score(self, value:int) -> None:
         """Increase enemy wave's score.
         value:  damaged or destoryed score increment"""
@@ -424,6 +437,122 @@ class Storm(OnScreen):
                 enemies.increase_score(SCORE_DESTROY_ENEMY * member.n)
 
 
+class Pilot:
+    """Entry for the hall of fames."""
+    def __init__(self, name, score):
+        self._name = name.upper()[:4]  # all names 4 uppercased characters
+        self._score = score
+
+    def __str__(self):
+        """Return a formatted representation of the entry."""
+        return "{name:.<10}{score:07}".format(name=self._name, score=self._score)
+
+    def __lt__(self, other):
+        """Rich comparison for bisecting.
+        other:  other Pilot"""
+        return self._score < other.score
+
+    @property
+    def score(self) -> int:
+        """Return score value."""
+        return self._score
+
+
+class HallOfFame:
+    """The hall of fame contains the best hi-scores."""
+    def __init__(self, filename:str) -> None:
+        """Initialize the hall of fame.
+        filename:       path to shelve file"""
+        self._filename = filename
+        self._hof = []  # list of Pilots
+
+    def __str__(self):
+        """Return the string representation, each entry in a new line."""
+        return "\n".join(map(str, self._hof[::-1]))
+
+    @property
+    def hof(self):
+        """Return the hall of fame as an iterable in reversed order."""
+        return self._hof[::-1]
+
+    @property
+    def hiscore(self) -> int:
+        """Return the actual hiscore."""
+        return self._hof[HOF_CHART-1].score
+
+    def restore(self) -> None:
+        """Restore hall of fame from shelve."""
+        with shelve.open(self._filename) as hof:
+            for i in range(HOF_CHART):
+                entry = hof.get(str(i), None)
+                if entry is None:
+                    self._hof.append(Pilot(HOF_DEFAULT_NAME, HOF_DEFAULT_SCORE))
+                else:
+                    self._hof.append(entry)
+
+    def insert(self, entry:Pilot) -> None:
+        """Insert a new entry into the hall of fame.
+        entry:  Pilot object"""
+        bisect.insort_left(self._hof, entry)
+        self._hof = self._hof[1:HOF_CHART+1]  # always get rid of the lowest value after insertion
+        self._save()
+
+    def is_new_hiscore(self, score:int) -> bool:
+        """Return True if this is a new hi-score.
+        score:  score to compare"""
+        return score > self.hiscore
+
+    def is_eligible(self, score:int) -> bool:
+        """Return True if this score is eligible to enter the hall of fame.
+        score:  score to compare"""
+        return score > self._hof[0].score
+
+    def _save(self) -> None:
+        """Write hall of fame to shelve."""
+        with shelve.open(self._filename) as hof:
+            for i in range(HOF_CHART):
+                hof[str(i)] = self._hof[i]
+
+
+class NameEntryDialog(Frame):
+    """Tkinter dialog box to enter a name."""
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent, bg="black")
+        self.master.title("Euclides")
+        self._pilot_name = StringVar()
+        self._validated_name = HOF_DEFAULT_NAME
+        self.body()
+        self.pack()
+
+    @property
+    def pilot_name(self):
+        """Return the entered name."""
+        return self._validated_name
+
+    def body(self):
+        """Display the dialog."""
+        Label(self, text="Enter your name, Pilot!", bg="black", fg="white").pack()
+        entry = Entry(self, textvariable=self._pilot_name, width=30, bg="black", fg="white")
+        entry.bind("<KeyPress-KP_Enter>", self.apply)
+        entry.bind("<KeyPress-Return>", self.apply)
+        entry.pack()
+        Button(self, text="OK", width=12, command=self.apply, bg="black", fg="white").pack(side=LEFT)
+        Button(self, text="Cancel", width=12, command=self.quit, bg="black", fg="white").pack()
+        entry.focus_set()
+
+    def validate(self):
+        """Validate user's entry."""
+        name = self._pilot_name.get().upper()[:4]
+        if name:
+            self._validated_name = name
+        return messagebox.askokcancel("Are you sure?", "{} will be shown.".format(self._validated_name), parent=self)
+
+    def apply(self, event=None):
+        """Validate and quit."""
+        if self.validate():
+            self.quit()
+
+
 class Euclides:
     """Main game application."""
     def __init__(self) -> None:
@@ -433,8 +562,10 @@ class Euclides:
         mixer.set_num_channels(64)  # continous fire alone needs 20
         pygame.display.set_caption("Euclides")
 
-        # restore hi-score
-        self._hiscore = self._load_hiscore()
+        # restore hall of fame
+        self._hall_of_fame = HallOfFame(HOF_FILE)
+        self._hall_of_fame.restore()
+        self._hiscore = self._hall_of_fame.hiscore
 
         # setup player
         self._player = Player()
@@ -481,25 +612,18 @@ class Euclides:
         self._hostile.reset()
         self._onscreen.add(*args)
 
-    def _is_new_hiscore(self, score, hiscore) -> bool:
-        """Return True if score is higher than the hi-score."""
-        return score > hiscore
-
-    def _get_hiscore(self, score, hiscore) -> int:
-        if self._is_new_hiscore(score, hiscore):
-            return score
-        else:
-            return hiscore
-
     def _intro(self, screen) -> State:
         """Show game title screen.
         screen: pygame display"""
         title = PlainText("font/RubikMonoOne-Regular.ttf", 60, "EUCLIDES", WHITE, TITLE_POS)
         subtitle = PlainText("font/ShareTechMono-Regular.ttf", 30, "a geometric shooter", WHITE, SUBTITLE_POS)
-        self._set_screen(self._score, self._highscore, title, subtitle, self._player)
+        fame = PlainText("font/ShareTechMono-Regular.ttf", 24, "Hall of Fame", WHITE, FAME_POS)
+        hall = OnScreen()
+        for i, entry in enumerate(self._hall_of_fame.hof):
+            hall.add(PlainText("font/ShareTechMono-Regular.ttf", 18, str(entry), WHITE, (400, 320+i*18)))
+        self._set_screen(self._score, self._highscore, title, subtitle, fame, hall, self._player)
 
         while True:
-            time.Clock().tick(FPS)
             screen.fill(BLACK)
 
             for event in pygame.event.get():
@@ -511,8 +635,7 @@ class Euclides:
                 if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(mouse.get_pos()):
                     return State.PLAY
 
-            self._highscore.update(hiscore=self._hiscore)
-            changed = self._onscreen.update(screen=screen, state=State.INTRO)
+            changed = self._onscreen.update(screen=screen, state=State.INTRO, hiscore=self._hiscore)
             pygame.display.update(changed)
 
     def _play(self, screen) -> State:
@@ -573,33 +696,31 @@ class Euclides:
             if not self._player.alive():
                 return State.GAME_OVER
 
-            # update hiscore
-            actual_hiscore = self._get_hiscore(self._hostile.score, self._hiscore)
-
             # update sprites
             changed = self._onscreen.update(screen=screen,
                                             state=State.PLAY,
                                             score=self._hostile.score,
-                                            hiscore=actual_hiscore)
+                                            hiscore=max(self._hostile.score, self._hiscore))
             pygame.display.update(changed)
 
     def _end(self, screen) -> State:
         """Show game over screen.
         screen: pygame display"""
-        game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, TITLE_POS, State.INTRO)
-        new_hiscore = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, SUBTITLE_POS)
+        game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS, State.INTRO)
         score = self._hostile.score
         self._set_screen(self._score, self._highscore, game_over)
-        if self._is_new_hiscore(score, self._hiscore):
-            self._onscreen.add(new_hiscore)
+        text = None
+        if self._hall_of_fame.is_new_hiscore(score):
+            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "It's a new hi-score!", WHITE, NEWHI_POS)
             self._hiscore = score
-            self._save_hiscore(self._hiscore)
+        elif self._hall_of_fame.is_eligible(score):
+            text = PlainText("font/ShareTechMono-Regular.ttf", 30, "You've made it to the hall of fame!", WHITE, NEWHI_POS)
+        if text:
+            self._onscreen.add(text)
 
         while True:
-            time.Clock().tick(FPS)
             screen.fill(BLACK)
 
-            mouse_up = False
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
                     return State.QUIT
@@ -607,6 +728,8 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
                 if event.type == MOUSEBUTTONUP and game_over.rect.collidepoint(mouse.get_pos()):
+                    if text:
+                        self._enter_name(score)
                     return State.INTRO
 
             changed = self._onscreen.update(screen=screen,
@@ -615,16 +738,12 @@ class Euclides:
                                             mouse_pos=mouse.get_pos())
             pygame.display.update(changed)
 
-    def _load_hiscore(self) -> int:
-        """Load hi-score from persistent dictionary."""
-        with shelve.open("hiscore") as hsc:
-            hiscore = hsc.get("hiscore", 0)
-        return hiscore
-
-    def _save_hiscore(self, hiscore) -> None:
-        """Save hi-score to persistent dictionary."""
-        with shelve.open("hiscore") as hsc:
-            hsc["hiscore"] = hiscore
+    def _enter_name(self, score):
+        tk_root = tkinter.Tk()
+        entry = NameEntryDialog(tk_root)
+        tk_root.mainloop()
+        tk_root.destroy()
+        self._hall_of_fame.insert(Pilot(entry.pilot_name, score))
 
 
 if __name__ == "__main__":
