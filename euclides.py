@@ -37,8 +37,10 @@ ENEMY_SIZE_DECREMENT = -5
 ENEMY_STARTING_SPEED = 2.5
 ENEMY_SPEED_INCREMENT = 0.5
 ENEMY_STARTING_VERTICES = 4
-ENEMY_PROJECTILE_STARTING_SPEED = 2
-ENEMY_PROJECTILE_SPEED_INCREMENT = 1
+ENEMY_WAVE_STARTING_FIRE_COOLDOWN = 2000
+ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT = 100
+ENEMY_PROJECTILE_STARTING_SPEED = 6
+ENEMY_PROJECTILE_SPEED_INCREMENT = 0.2
 
 SCORE_POS = (160, 10)
 HISCORE_POS = (610, 10)
@@ -81,7 +83,15 @@ class Trig:
         displacement:   displacement in pixel
         angle:          angle in radians"""
         return math.ceil(displacement*math.cos(angle)), math.ceil(displacement*math.sin(angle))
-
+    
+    def angle(origin:tuple, target:tuple) -> float:
+        """Calculate the angle between two points. Return the angle as radians.
+        https://stackoverflow.com/questions/10473930/
+        origin: tuple of (x, y), center coordinates of an enemy
+        target: tuple of (x, y), center coordinates of player"""
+        dx = target[0] - origin[0]
+        dy = target[1] - origin[1]
+        return math.atan2(dy, dx)
 
 class Polygon(sprite.Sprite):
     """All game objects in Euclides are regular polygons.
@@ -264,12 +274,13 @@ class Player(Spaceship):
 
 class Projectile(Polygon):
     """The polygon shoots same shaped projectiles."""
-    def __init__(self, owner:Polygon, speed:int, angle:float) -> None:
-        """The projectile needs to know who fired it off, to get its size and shape.
+    def __init__(self, owner:Polygon, speed:int, target:Player=None) -> None:
+        """The projectile needs to know who fired it off, to get its size, shape and start poisiton.
         owner:  player on enemy sprite
         speed:  displacement in pixel
-        angle:  shooting angle in radians"""
+        target: enemy's target"""
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
+        angle = PI*1.5 if target is None else Trig.angle(owner.rect.center, target.rect.center)
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
 
     def update(self, *args, **kwargs) -> None:
@@ -415,8 +426,21 @@ class Wave(OnScreen):
 
     def reset(self):
         """When player restarts the game."""
+        self._last_fire = time.get_ticks()
+        self._weapon_cooldown = ENEMY_WAVE_STARTING_FIRE_COOLDOWN
         self._score = 0
         self.empty()
+
+    def is_ready_to_fire(self) -> bool:
+        """Check player's ability to fire."""
+        now = time.get_ticks()
+        time_since_last_fire = now - self._last_fire
+        return time_since_last_fire >= self._weapon_cooldown
+
+    def set_last_fire(self) -> None:
+        """Set timer for weapon cooldown."""
+        self._weapon_cooldown -= ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT
+        self._last_fire = time.get_ticks()
 
 
 class Storm(OnScreen):
@@ -435,6 +459,11 @@ class Storm(OnScreen):
             enemies.increase_score(SCORE_HULL_DAMAGE * member.n)
             if member.is_destroyed:
                 enemies.increase_score(SCORE_DESTROY_ENEMY * member.n)
+
+    def reset(self):
+        """When player restarts the game."""
+        self._score = 0
+        self.empty()
 
 
 class Pilot:
@@ -579,6 +608,7 @@ class Euclides:
         # setup sprite groups
         self._fire = Storm()  # container for player's projectiles
         self._hostile = Wave()  # container for enemy spacecrafts
+        self._hostile_fire = Storm()  # container for enemy projectiles
         self._onscreen = OnScreen()  # container for sprites on screen
 
         self._main()
@@ -612,6 +642,7 @@ class Euclides:
         self._player.reset()
         self._fire.empty()
         self._hostile.reset()
+        self._hostile_fire.empty()
         self._onscreen.add(*args)
 
     def _intro(self, screen) -> State:
@@ -683,10 +714,18 @@ class Euclides:
 
             # shoot player projectiles
             if self._player.is_ready_to_fire() and self._player.fires:
-                self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED, PI*1.5))
+                self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED))
                 self._onscreen.add(self._fire)
                 self._player.set_last_fire()
                 shot_sound.play()
+            
+            # shoot enemy projectiles
+            if self._hostile.is_ready_to_fire() and bool(self._hostile):
+                enemy = random.choice(list(self._hostile))  # choose a random member from the wave
+                self._hostile_fire.add(Projectile(enemy, ENEMY_PROJECTILE_STARTING_SPEED, self._player))
+                self._onscreen.add(self._hostile_fire)
+                self._hostile.set_last_fire()
+
 
             # check whether player's projectile hits an enemy
             self._fire.hit(self._hostile)
