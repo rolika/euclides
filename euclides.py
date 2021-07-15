@@ -39,7 +39,7 @@ ENEMY_SPEED_INCREMENT = 0.5
 ENEMY_STARTING_VERTICES = 4
 ENEMY_WAVE_STARTING_FIRE_COOLDOWN = 2000
 ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT = 100
-ENEMY_PROJECTILE_STARTING_SPEED = 6
+ENEMY_PROJECTILE_STARTING_SPEED = 10
 ENEMY_PROJECTILE_SPEED_INCREMENT = 0.2
 
 SCORE_POS = (160, 10)
@@ -83,7 +83,7 @@ class Trig:
         displacement:   displacement in pixel
         angle:          angle in radians"""
         return math.ceil(displacement*math.cos(angle)), math.ceil(displacement*math.sin(angle))
-    
+
     def angle(origin:tuple, target:tuple) -> float:
         """Calculate the angle between two points. Return the angle as radians.
         https://stackoverflow.com/questions/10473930/
@@ -92,6 +92,7 @@ class Trig:
         dx = target[0] - origin[0]
         dy = target[1] - origin[1]
         return math.atan2(dy, dx)
+
 
 class Polygon(sprite.Sprite):
     """All game objects in Euclides are regular polygons.
@@ -426,6 +427,7 @@ class Wave(OnScreen):
 
     def reset(self):
         """When player restarts the game."""
+        self.empty()
         self._last_fire = time.get_ticks()
         self._weapon_cooldown = ENEMY_WAVE_STARTING_FIRE_COOLDOWN
         self._score = 0
@@ -443,7 +445,7 @@ class Wave(OnScreen):
         self._last_fire = time.get_ticks()
 
 
-class Storm(OnScreen):
+class Swarm(OnScreen):
     """Sprite container for projectiles."""
     def __init__(self, *sprites:Enemy) -> None:
         """Uses default initialization.
@@ -461,7 +463,7 @@ class Storm(OnScreen):
                 enemies.increase_score(SCORE_DESTROY_ENEMY * member.n)
 
     def reset(self):
-        """When player restarts the game."""
+        """When player restarts the game or reaces a new level."""
         self._score = 0
         self.empty()
 
@@ -606,9 +608,9 @@ class Euclides:
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, WHITE, HISCORE_POS)
 
         # setup sprite groups
-        self._fire = Storm()  # container for player's projectiles
+        self._fire = Swarm()  # container for player's projectiles
         self._hostile = Wave()  # container for enemy spacecrafts
-        self._hostile_fire = Storm()  # container for enemy projectiles
+        self._hostile_fire = Swarm()  # container for enemy projectiles
         self._onscreen = OnScreen()  # container for sprites on screen
 
         self._main()
@@ -702,6 +704,8 @@ class Euclides:
 
             # setup enemy wave
             if not bool(self._hostile):
+                self._hostile.reset()
+                self._hostile_fire.reset()
                 size += ENEMY_SIZE_DECREMENT
                 n += 1
                 speed += ENEMY_SPEED_INCREMENT
@@ -718,7 +722,7 @@ class Euclides:
                 self._onscreen.add(self._fire)
                 self._player.set_last_fire()
                 shot_sound.play()
-            
+
             # shoot enemy projectiles
             if self._hostile.is_ready_to_fire() and bool(self._hostile):
                 enemy = random.choice(list(self._hostile))  # choose a random member from the wave
