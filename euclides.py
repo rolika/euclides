@@ -405,7 +405,7 @@ class Wave(OnScreen):
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
-        self.reset()
+        self.reset_game()
 
     @property
     def score(self) -> int:
@@ -425,13 +425,17 @@ class Wave(OnScreen):
             enemy.damage()
             player.damage()
 
-    def reset(self):
+    def reset_game(self):
         """When player restarts the game."""
         self.empty()
+        self._score = 0
+        self.reset_level()
+    
+    def reset_level(self):
+        """When player reaches a new level."""
         self._last_fire = time.get_ticks()
         self._weapon_cooldown = ENEMY_WAVE_STARTING_FIRE_COOLDOWN
-        self._score = 0
-        self.empty()
+        
 
     def is_ready_to_fire(self) -> bool:
         """Check player's ability to fire."""
@@ -643,7 +647,7 @@ class Euclides:
         self._onscreen.empty()
         self._player.reset()
         self._fire.empty()
-        self._hostile.reset()
+        self._hostile.reset_game()
         self._hostile_fire.empty()
         self._onscreen.add(*args)
 
@@ -704,7 +708,7 @@ class Euclides:
 
             # setup enemy wave
             if not bool(self._hostile):
-                self._hostile.reset()
+                self._hostile.reset_level()
                 self._hostile_fire.reset()
                 size += ENEMY_SIZE_DECREMENT
                 n += 1
