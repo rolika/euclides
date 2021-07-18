@@ -455,6 +455,17 @@ class Swarm(OnScreen):
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
+        self.reset()
+
+    @property
+    def score(self) -> int:
+        """Return the waves calculated score."""
+        return self._score
+
+    def increase_score(self, value:int) -> None:
+        """Increase enemy wave's score.
+        value:  damaged or destoryed score increment"""
+        self._score += value
 
     def hit(self, target:Wave) -> None:
         """Detect collision between projectiles and their target.
@@ -471,6 +482,12 @@ class Swarm(OnScreen):
         player:     player sprite"""
         for _ in sprite.spritecollide(player, self, True, sprite.collide_circle):
             player.damage()
+
+    def contact(self, hostile_fire):
+        """Detect collision between player's and hostile fire.
+        hostile_fire:   hostile Swarm of projectiles"""
+        for enemy_projectile in sprite.groupcollide(hostile_fire, self, True, True, collided=sprite.collide_circle):
+            hostile_fire.increase_score(SCORE_DESTROY_ENEMY * enemy_projectile.n * 2)
 
     def reset(self):
         """When player restarts the game or reaches a new level."""
@@ -744,7 +761,7 @@ class Euclides:
             self._fire.hit(self._hostile)
 
             # check whether player's projectile hits an enemy projectile
-            #self._fire.hit(self._hostile_fire)
+            self._fire.contact(self._hostile_fire)
 
             # check whether hostile fire hits player
             self._hostile_fire.harm(self._player)
@@ -760,14 +777,14 @@ class Euclides:
             changed = self._onscreen.update(screen=screen,
                                             state=State.PLAY,
                                             score=self._hostile.score,
-                                            hiscore=max(self._hostile.score, self._hiscore))
+                                            hiscore=max(self._hostile.score+self._hostile_fire.score, self._hiscore))
             pygame.display.update(changed)
 
     def _end(self, screen) -> State:
         """Show game over screen.
         screen: pygame display"""
         game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS, State.INTRO)
-        score = self._hostile.score
+        score = self._hostile.score + self._hostile_fire.score
         self._set_screen(self._score, self._highscore, game_over)
         text = None
         if self._hall_of_fame.is_new_hiscore(score):
