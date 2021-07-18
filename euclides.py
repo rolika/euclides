@@ -430,12 +430,12 @@ class Wave(OnScreen):
         self.empty()
         self._score = 0
         self.reset_level()
-    
+
     def reset_level(self):
         """When player reaches a new level."""
         self._last_fire = time.get_ticks()
         self._weapon_cooldown = ENEMY_WAVE_STARTING_FIRE_COOLDOWN
-        
+
 
     def is_ready_to_fire(self) -> bool:
         """Check player's ability to fire."""
@@ -456,18 +456,24 @@ class Swarm(OnScreen):
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
 
-    def hit(self, enemies:Wave) -> None:
-        """Detect collision between projectiles and enemies.
-        Colliding projectiles get killed off (dokill2=True).
-        spaceship:  enemies"""
-        for member in sprite.groupcollide(enemies, self, False, True, sprite.collide_circle):
-            member.damage()
-            enemies.increase_score(SCORE_HULL_DAMAGE * member.n)
-            if member.is_destroyed:
-                enemies.increase_score(SCORE_DESTROY_ENEMY * member.n)
+    def hit(self, target:Wave) -> None:
+        """Detect collision between projectiles and their target.
+        Colliding projectiles get killed off (dokill2=True), target takes damage.
+        target:  Wave of spaceship(s)"""
+        for ship in sprite.groupcollide(target, self, False, True, sprite.collide_circle):
+            ship.damage()
+            target.increase_score(SCORE_HULL_DAMAGE * ship.n)
+            if ship.is_destroyed:
+                target.increase_score(SCORE_DESTROY_ENEMY * ship.n)
+
+    def contact(self, player:sprite.Sprite):
+        """Detect collision between player and enemy fire and reduce hull.
+        player:     player sprite"""
+        for _ in sprite.spritecollide(player, self, True, sprite.collide_circle):
+            player.damage()
 
     def reset(self):
-        """When player restarts the game or reaces a new level."""
+        """When player restarts the game or reaches a new level."""
         self._score = 0
         self.empty()
 
@@ -680,7 +686,7 @@ class Euclides:
     def _play(self, screen) -> State:
         """Play the game.
         screen: pygame display"""
-        self._set_screen(self._score, self._highscore, self._player, self._fire, self._hostile)
+        self._set_screen(self._score, self._highscore, self._player, self._hostile)
 
         size = ENEMY_STARTING_SIZE
         n = 3
@@ -734,9 +740,14 @@ class Euclides:
                 self._onscreen.add(self._hostile_fire)
                 self._hostile.set_last_fire()
 
-
             # check whether player's projectile hits an enemy
             self._fire.hit(self._hostile)
+
+            # check whether player's projectile hits an enemy projectile
+            #self._fire.hit(self._hostile_fire)
+
+            # check whether hostile fire hits player
+            self._hostile_fire.contact(self._player)  # convenient way to detect collision
 
             # check player collisions with enemy craft
             self._hostile.contact(self._player)
