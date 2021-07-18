@@ -812,7 +812,7 @@ class Euclides:
     def _enter_name(self, score):
         """Enter a name and save to database.
         score:  player's last score"""
-        tk_root = tkinter.Tk()
+        tk_root = Tk()
         entry = NameEntryDialog(tk_root)
         tk_root.mainloop()
         tk_root.destroy()
