@@ -466,7 +466,7 @@ class Swarm(OnScreen):
             if ship.is_destroyed:
                 target.increase_score(SCORE_DESTROY_ENEMY * ship.n)
 
-    def contact(self, player:sprite.Sprite):
+    def harm(self, player:sprite.Sprite):
         """Detect collision between player and enemy fire and reduce hull.
         player:     player sprite"""
         for _ in sprite.spritecollide(player, self, True, sprite.collide_circle):
@@ -747,7 +747,7 @@ class Euclides:
             #self._fire.hit(self._hostile_fire)
 
             # check whether hostile fire hits player
-            self._hostile_fire.contact(self._player)  # convenient way to detect collision
+            self._hostile_fire.harm(self._player)
 
             # check player collisions with enemy craft
             self._hostile.contact(self._player)
