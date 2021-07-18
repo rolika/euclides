@@ -1,10 +1,5 @@
-import tkinter
 import pygame
-from pygame import sprite
-from pygame import time
-from pygame import font
-from pygame import mouse
-from pygame import mixer
+from pygame import sprite, time, font, mouse, mixer
 from pygame.locals import *
 import math
 import random
@@ -13,7 +8,6 @@ import enum
 import bisect
 from tkinter import *
 from tkinter import messagebox
-
 
 
 PI = math.pi
