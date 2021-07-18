@@ -1,10 +1,5 @@
-import tkinter
 import pygame
-from pygame import sprite
-from pygame import time
-from pygame import font
-from pygame import mouse
-from pygame import mixer
+from pygame import sprite, time, font, mouse, mixer
 from pygame.locals import *
 import math
 import random
@@ -13,7 +8,6 @@ import enum
 import bisect
 from tkinter import *
 from tkinter import messagebox
-
 
 
 PI = math.pi
@@ -37,8 +31,10 @@ ENEMY_SIZE_DECREMENT = -5
 ENEMY_STARTING_SPEED = 2.5
 ENEMY_SPEED_INCREMENT = 0.5
 ENEMY_STARTING_VERTICES = 4
-ENEMY_PROJECTILE_STARTING_SPEED = 2
-ENEMY_PROJECTILE_SPEED_INCREMENT = 1
+ENEMY_WAVE_STARTING_FIRE_COOLDOWN = 2000
+ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT = 100
+ENEMY_PROJECTILE_STARTING_SPEED = 10
+ENEMY_PROJECTILE_SPEED_INCREMENT = 0.2
 
 SCORE_POS = (160, 10)
 HISCORE_POS = (610, 10)
@@ -81,6 +77,15 @@ class Trig:
         displacement:   displacement in pixel
         angle:          angle in radians"""
         return math.ceil(displacement*math.cos(angle)), math.ceil(displacement*math.sin(angle))
+
+    def angle(origin:tuple, target:tuple) -> float:
+        """Calculate the angle between two points. Return the angle as radians.
+        https://stackoverflow.com/questions/10473930/
+        origin: tuple of (x, y), center coordinates of an enemy
+        target: tuple of (x, y), center coordinates of player"""
+        dx = target[0] - origin[0]
+        dy = target[1] - origin[1]
+        return math.atan2(dy, dx)
 
 
 class Polygon(sprite.Sprite):
@@ -264,12 +269,13 @@ class Player(Spaceship):
 
 class Projectile(Polygon):
     """The polygon shoots same shaped projectiles."""
-    def __init__(self, owner:Polygon, speed:int, angle:float) -> None:
-        """The projectile needs to know who fired it off, to get its size and shape.
+    def __init__(self, owner:Polygon, speed:int, target:Player=None) -> None:
+        """The projectile needs to know who fired it off, to get its size, shape and start poisiton.
         owner:  player on enemy sprite
         speed:  displacement in pixel
-        angle:  shooting angle in radians"""
+        target: enemy's target"""
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
+        angle = PI*1.5 if target is None else Trig.angle(owner.rect.center, target.rect.center)
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
 
     def update(self, *args, **kwargs) -> None:
@@ -393,7 +399,7 @@ class Wave(OnScreen):
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
-        self.reset()
+        self.reset_game()
 
     @property
     def score(self) -> int:
@@ -413,28 +419,74 @@ class Wave(OnScreen):
             enemy.damage()
             player.damage()
 
-    def reset(self):
+    def reset_game(self):
         """When player restarts the game."""
-        self._score = 0
         self.empty()
+        self._score = 0
+        self.reset_level()
+
+    def reset_level(self):
+        """When player reaches a new level."""
+        self._last_fire = time.get_ticks()
+        self._weapon_cooldown = ENEMY_WAVE_STARTING_FIRE_COOLDOWN
 
 
-class Storm(OnScreen):
+    def is_ready_to_fire(self) -> bool:
+        """Check player's ability to fire."""
+        now = time.get_ticks()
+        time_since_last_fire = now - self._last_fire
+        return time_since_last_fire >= self._weapon_cooldown
+
+    def set_last_fire(self) -> None:
+        """Set timer for weapon cooldown."""
+        self._weapon_cooldown -= ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT
+        self._last_fire = time.get_ticks()
+
+
+class Swarm(OnScreen):
     """Sprite container for projectiles."""
     def __init__(self, *sprites:Enemy) -> None:
         """Uses default initialization.
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
+        self.reset()
 
-    def hit(self, enemies:Wave) -> None:
-        """Detect collision between projectiles and enemies.
-        Colliding projectiles get killed off (dokill2=True).
-        spaceship:  enemies"""
-        for member in sprite.groupcollide(enemies, self, False, True, sprite.collide_circle):
-            member.damage()
-            enemies.increase_score(SCORE_HULL_DAMAGE * member.n)
-            if member.is_destroyed:
-                enemies.increase_score(SCORE_DESTROY_ENEMY * member.n)
+    @property
+    def score(self) -> int:
+        """Return the waves calculated score."""
+        return self._score
+
+    def increase_score(self, value:int) -> None:
+        """Increase enemy wave's score.
+        value:  damaged or destoryed score increment"""
+        self._score += value
+
+    def hit(self, target:Wave) -> None:
+        """Detect collision between projectiles and their target.
+        Colliding projectiles get killed off (dokill2=True), target takes damage.
+        target:  Wave of spaceship(s)"""
+        for ship in sprite.groupcollide(target, self, False, True, sprite.collide_circle):
+            ship.damage()
+            target.increase_score(SCORE_HULL_DAMAGE * ship.n)
+            if ship.is_destroyed:
+                target.increase_score(SCORE_DESTROY_ENEMY * ship.n)
+
+    def harm(self, player:sprite.Sprite):
+        """Detect collision between player and enemy fire and reduce hull.
+        player:     player sprite"""
+        for _ in sprite.spritecollide(player, self, True, sprite.collide_circle):
+            player.damage()
+
+    def contact(self, hostile_fire):
+        """Detect collision between player's and hostile fire.
+        hostile_fire:   hostile Swarm of projectiles"""
+        for enemy_projectile in sprite.groupcollide(hostile_fire, self, True, True, collided=sprite.collide_circle):
+            hostile_fire.increase_score(SCORE_DESTROY_ENEMY * enemy_projectile.n * 2)
+
+    def reset(self):
+        """When player restarts the game or reaches a new level."""
+        self._score = 0
+        self.empty()
 
 
 class Pilot:
@@ -577,8 +629,9 @@ class Euclides:
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, WHITE, HISCORE_POS)
 
         # setup sprite groups
-        self._fire = Storm()  # container for player's projectiles
+        self._fire = Swarm()  # container for player's projectiles
         self._hostile = Wave()  # container for enemy spacecrafts
+        self._hostile_fire = Swarm()  # container for enemy projectiles
         self._onscreen = OnScreen()  # container for sprites on screen
 
         self._main()
@@ -611,7 +664,8 @@ class Euclides:
         self._onscreen.empty()
         self._player.reset()
         self._fire.empty()
-        self._hostile.reset()
+        self._hostile.reset_game()
+        self._hostile_fire.empty()
         self._onscreen.add(*args)
 
     def _intro(self, screen) -> State:
@@ -643,7 +697,7 @@ class Euclides:
     def _play(self, screen) -> State:
         """Play the game.
         screen: pygame display"""
-        self._set_screen(self._score, self._highscore, self._player, self._fire, self._hostile)
+        self._set_screen(self._score, self._highscore, self._player, self._hostile)
 
         size = ENEMY_STARTING_SIZE
         n = 3
@@ -671,6 +725,8 @@ class Euclides:
 
             # setup enemy wave
             if not bool(self._hostile):
+                self._hostile.reset_level()
+                self._hostile_fire.reset()
                 size += ENEMY_SIZE_DECREMENT
                 n += 1
                 speed += ENEMY_SPEED_INCREMENT
@@ -683,13 +739,26 @@ class Euclides:
 
             # shoot player projectiles
             if self._player.is_ready_to_fire() and self._player.fires:
-                self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED, PI*1.5))
+                self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED))
                 self._onscreen.add(self._fire)
                 self._player.set_last_fire()
                 shot_sound.play()
 
+            # shoot enemy projectiles
+            if self._hostile.is_ready_to_fire() and bool(self._hostile):
+                enemy = random.choice(list(self._hostile))  # choose a random member from the wave
+                self._hostile_fire.add(Projectile(enemy, ENEMY_PROJECTILE_STARTING_SPEED, self._player))
+                self._onscreen.add(self._hostile_fire)
+                self._hostile.set_last_fire()
+
             # check whether player's projectile hits an enemy
             self._fire.hit(self._hostile)
+
+            # check whether player's projectile hits an enemy projectile
+            self._fire.contact(self._hostile_fire)
+
+            # check whether hostile fire hits player
+            self._hostile_fire.harm(self._player)
 
             # check player collisions with enemy craft
             self._hostile.contact(self._player)
@@ -702,14 +771,14 @@ class Euclides:
             changed = self._onscreen.update(screen=screen,
                                             state=State.PLAY,
                                             score=self._hostile.score,
-                                            hiscore=max(self._hostile.score, self._hiscore))
+                                            hiscore=max(self._hostile.score+self._hostile_fire.score, self._hiscore))
             pygame.display.update(changed)
 
     def _end(self, screen) -> State:
         """Show game over screen.
         screen: pygame display"""
         game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS, State.INTRO)
-        score = self._hostile.score
+        score = self._hostile.score + self._hostile_fire.score
         self._set_screen(self._score, self._highscore, game_over)
         text = None
         if self._hall_of_fame.is_new_hiscore(score):
@@ -743,7 +812,7 @@ class Euclides:
     def _enter_name(self, score):
         """Enter a name and save to database.
         score:  player's last score"""
-        tk_root = tkinter.Tk()
+        tk_root = Tk()
         entry = NameEntryDialog(tk_root)
         tk_root.mainloop()
         tk_root.destroy()
