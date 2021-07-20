@@ -125,7 +125,7 @@ class Spaceship(Polygon):
         pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__(size, n, pos)
         self._hull = n
-        self._fade_factor = 255 // n
+        self._fade = 255 // n  # each damage darkens the ship
 
         # setup sounds
         self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
@@ -141,22 +141,15 @@ class Spaceship(Polygon):
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
-        self._fade()
+        self._fadeout()
         self._ship_damage_sound.play()
         if self.is_destroyed:
             self._ship_destroyed_sound.play()
             self.kill()
 
-    def _fade(self):
-        """Fade spaceship to grey if damaged."""
-        width = self.image.get_width()
-        height = self.image.get_height()
-        for x  in range(width):
-            for y in range(height):
-                r, _, _, _ = self.image.get_at((x, y))
-                if r:
-                    grey = r - self._fade_factor
-                    self.image.set_at((x, y), (grey, grey, grey))
+    def _fadeout(self):
+        """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
+        self.image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
 
 
 class Enemy(Spaceship):
