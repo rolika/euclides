@@ -125,6 +125,7 @@ class Spaceship(Polygon):
         pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__(size, n, pos)
         self._hull = n
+        self._fade_factor = 255 // n
 
         # setup sounds
         self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
@@ -132,18 +133,30 @@ class Spaceship(Polygon):
         self._ship_destroyed_sound = mixer.Sound("wav/explosion.wav")
         self._ship_destroyed_sound.set_volume(1)
 
+    @property
+    def is_destroyed(self) -> bool:
+        """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
+        return self._hull < 1
+
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
+        self._fade()
         self._ship_damage_sound.play()
         if self.is_destroyed:
             self._ship_destroyed_sound.play()
             self.kill()
 
-    @property
-    def is_destroyed(self) -> bool:
-        """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
-        return self._hull < 1
+    def _fade(self):
+        """Fade spaceship to grey if damaged."""
+        width = self.image.get_width()
+        height = self.image.get_height()
+        for x  in range(width):
+            for y in range(height):
+                r, _, _, _ = self.image.get_at((x, y))
+                if r:
+                    grey = r - self._fade_factor
+                    self.image.set_at((x, y), (grey, grey, grey))
 
 
 class Enemy(Spaceship):
