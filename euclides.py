@@ -627,9 +627,6 @@ class Euclides:
         self._hall_of_fame.restore()
         self._hiscore = self._hall_of_fame.hiscore
 
-        # setup player
-        self._player = Player()
-
         # setup scores
         self._score = Score("font/Monofett-Regular.ttf", 40, WHITE, SCORE_POS)
         self._highscore = HiScore("font/Monofett-Regular.ttf", 40, WHITE, HISCORE_POS)
@@ -668,7 +665,8 @@ class Euclides:
         """Set game screen, containers etc.
         args:   screen elements (sprites, containers)"""
         self._onscreen.empty()
-        self._player.reset()
+        self._player = Player()
+        self._onscreen.add(self._player)
         self._fire.empty()
         self._hostile.reset_game()
         self._hostile_fire.empty()
@@ -683,7 +681,7 @@ class Euclides:
         hall = OnScreen()
         for i, entry in enumerate(self._hall_of_fame.hof):
             hall.add(PlainText("font/ShareTechMono-Regular.ttf", 18, str(entry), WHITE, (400, 320+i*18)))
-        self._set_screen(self._score, self._highscore, title, subtitle, fame, hall, self._player)
+        self._set_screen(self._score, self._highscore, title, subtitle, fame, hall)
 
         while True:
             screen.fill(BLACK)
@@ -703,7 +701,7 @@ class Euclides:
     def _play(self, screen) -> State:
         """Play the game.
         screen: pygame display"""
-        self._set_screen(self._score, self._highscore, self._player, self._hostile)
+        self._set_screen(self._score, self._highscore, self._hostile)
 
         size = ENEMY_STARTING_SIZE
         n = 3
