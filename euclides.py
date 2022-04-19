@@ -52,6 +52,14 @@ HOF_CHART = 10  # number of entries in the hall of fames
 HOF_DEFAULT_NAME = "ROLI"
 HOF_DEFAULT_SCORE = 1000
 
+GUNSHOOT = "wav/gunshoot.wav"
+EXPLOSION = "wav/explosion.wav"
+ENEMY_HULL_DAMAGE = "wav/enemy_hull_damage.wav"
+BOUNCE_OFF = "wav/bounce_off.wav"
+
+TITLE_MUSIC = "wav/title_music.wav"
+OVER_MUSIC = "wav/over_music.wav"
+
 
 class State(enum.Enum):
     """Euclides game states"""
@@ -128,10 +136,12 @@ class Spaceship(Polygon):
         self._fade = 255 // n  # each damage darkens the ship
 
         # setup sounds
-        self._ship_damage_sound = mixer.Sound("wav/enemy_hull_damage.wav")
+        self._ship_damage_sound = mixer.Sound(ENEMY_HULL_DAMAGE)
         self._ship_damage_sound.set_volume(0.5)
-        self._ship_destroyed_sound = mixer.Sound("wav/explosion.wav")
+        self._ship_destroyed_sound = mixer.Sound(EXPLOSION)
         self._ship_destroyed_sound.set_volume(1)
+        self._bounce_off_sound = mixer.Sound(BOUNCE_OFF)
+        self._bounce_off_sound.set_volume(0.5)
 
     @property
     def is_destroyed(self) -> bool:
@@ -237,6 +247,7 @@ class Player(Spaceship):
             overlap = self.rect.right - enemy.rect.left
             enemy.rect.left -= overlap
         if overlap:
+            self._bounce_off_sound.play()
             enemy.turn_dy()
             enemy.turn_dx()
 
@@ -620,6 +631,7 @@ class Euclides:
         random.seed()
         pygame.init()
         mixer.set_num_channels(64)  # continous fire alone needs 20
+        mixer.music.set_volume(0.2)
         pygame.display.set_caption("Euclides")
 
         # restore hall of fame
@@ -683,6 +695,11 @@ class Euclides:
             hall.add(PlainText("font/ShareTechMono-Regular.ttf", 18, str(entry), WHITE, (400, 320+i*18)))
         self._set_screen(self._score, self._highscore, title, subtitle, fame, hall)
 
+        # setup background music
+        mixer.music.fadeout(500)
+        self._title_music = mixer.music.load(TITLE_MUSIC)
+        mixer.music.play(-1)
+
         while True:
             screen.fill(BLACK)
 
@@ -708,8 +725,11 @@ class Euclides:
         speed = ENEMY_STARTING_SPEED
 
         # setup sounds
-        shot_sound = mixer.Sound("wav/gunshot.wav")
+        shot_sound = mixer.Sound(GUNSHOOT)
         shot_sound.set_volume(0.25)
+
+        # mute background music
+        mixer.music.fadeout(500)
 
         while True:
             time.Clock().tick(FPS)
@@ -792,6 +812,10 @@ class Euclides:
             text = PlainText("font/ShareTechMono-Regular.ttf", 30, "A new entry to the hall of fame!", WHITE, NEWHI_POS)
         if text:
             self._onscreen.add(text)
+
+        # setup background music
+        self._title_music = mixer.music.load(OVER_MUSIC)
+        mixer.music.play(-1)
 
         while True:
             screen.fill(BLACK)
