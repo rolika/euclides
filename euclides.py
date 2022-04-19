@@ -649,6 +649,12 @@ class Euclides:
         self._hostile_fire = Swarm()  # container for enemy projectiles
         self._onscreen = OnScreen()  # container for sprites on screen
 
+        # setup sound
+        self._engine_startup = mixer.Sound("wav/engine_startup.wav")
+        self._engine_startup.set_volume(0.5)
+        self._energy_hum = mixer.Sound("wav/energy_hum.wav")
+        self._energy_hum.set_volume(0.5)
+
         self._main()
 
     def _main(self) -> None:
@@ -703,6 +709,11 @@ class Euclides:
         while True:
             screen.fill(BLACK)
 
+            if self._player.rect.collidepoint(mouse.get_pos()):
+                self._engine_startup.play()
+            else:
+                self._engine_startup.fadeout(500)
+
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
                     return State.QUIT
@@ -710,6 +721,7 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
                 if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(mouse.get_pos()):
+                    self._engine_startup.stop()
                     return State.PLAY
 
             changed = self._onscreen.update(screen=screen, state=State.INTRO, hiscore=self._hiscore)
@@ -820,6 +832,11 @@ class Euclides:
         while True:
             screen.fill(BLACK)
 
+            if game_over.rect.collidepoint(mouse.get_pos()):
+                self._energy_hum.play()
+            else:
+                self._energy_hum.fadeout(500)
+
             for event in pygame.event.get():
                 if event.type == QUIT:  # exit by closing the window
                     return State.QUIT
@@ -827,6 +844,7 @@ class Euclides:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
                 if event.type == MOUSEBUTTONUP and game_over.rect.collidepoint(mouse.get_pos()):
+                    self._energy_hum.stop()
                     if text:
                         self._enter_name(score)
                     return State.INTRO
