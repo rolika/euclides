@@ -132,7 +132,7 @@ class Polygon(sprite.Sprite):
         pygame.draw.polygon(self.image, WHITE, Trig.vertices(n, self.radius), 1)
          # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
          # this doesn't really matter in case of enemies and their bullets
-        self.image = pygame.transform.rotate(self.image, 180)
+        self.image = self._rotate(180)
         self.image.set_colorkey(self.image.get_at((0, 0)))
         self.rect = self.image.get_rect()
         self.rect.center = pos
@@ -141,6 +141,11 @@ class Polygon(sprite.Sprite):
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
+    
+    def _rotate(self, angle:float) -> pygame.Surface:
+        """Rotate the polygon.
+        angle:  angle in degrees"""
+        return pygame.transform.rotate(self.image, angle)
 
 
 class Spaceship(Polygon):
