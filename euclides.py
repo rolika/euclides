@@ -61,6 +61,27 @@ TITLE_MUSIC = "wav/title_music.wav"
 OVER_MUSIC = "wav/over_music.wav"
 
 
+def keep_on_screen(update:callable) -> callable:
+    """Decorator function.
+    Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and bounce the enemy off screen edges."""
+        if self.rect.left < 0:
+            self.rect.left = 0
+            self.turn_dx()
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH - 1
+            self.turn_dx()
+        if self.rect.top < 0:
+            self.rect.top = 0
+            self.turn_dy()
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT - 1
+            self.turn_dy()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
 class State(enum.Enum):
     """Euclides game states"""
     QUIT = enum.auto()
@@ -174,9 +195,9 @@ class Enemy(Spaceship):
         super().__init__(size, n, pos)
         self._dx, self._dy = Trig.offset(displacement, angle)  # enemies move right away after spawning
 
+    @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        self._keep_on_screen()
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
 
@@ -186,22 +207,6 @@ class Enemy(Spaceship):
 
     def turn_dy(self) -> None:
         """Turn around vertical movement."""
-        self._dy = -self._dy
-
-    def _keep_on_screen(self) -> None:
-        """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
-        if self.rect.left < 0:
-            self.rect.left = 0
-            self.turn_dx()
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH - 1
-            self.turn_dx()
-        if self.rect.top < 0:
-            self.rect.top = 0
-            self.turn_dy()
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT - 1
-            self.turn_dy()
 
 
 class Player(Spaceship):
