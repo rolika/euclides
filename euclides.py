@@ -141,7 +141,7 @@ class Polygon(sprite.Sprite):
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
-    
+
     def _rotate(self, angle:float) -> pygame.Surface:
         """Rotate the polygon.
         angle:  angle in degrees"""
@@ -233,7 +233,7 @@ class Player(Spaceship):
         """Set player's firing state.
         state:  boolean value"""
         self._fires = state
-    
+
     @property
     def fire_rate_timer(self) -> bool:
         """Return true if player can fire, otherwise false."""
@@ -425,8 +425,13 @@ class Wave(OnScreen):
         self.reset_game()
 
     @property
+    def fire_rate_timer(self) -> int:
+        """Return the fire rate timer."""
+        return self._fire_rate_timer
+
+    @property
     def score(self) -> int:
-        """Return the waves calculated score."""
+        """Return the wave's calculated score."""
         return self._score
 
     def increase_score(self, value:int) -> None:
@@ -448,22 +453,9 @@ class Wave(OnScreen):
         self._score = 0
         self.reset_level()
 
-    def reset_level(self):
-        """When player reaches a new level."""
-        self._last_fire = time.get_ticks()
-        self._weapon_cooldown = ENEMY_WAVE_STARTING_FIRE_COOLDOWN
-
-
-    def is_ready_to_fire(self) -> bool:
-        """Check the swarm's ability to fire."""
-        now = time.get_ticks()
-        time_since_last_fire = now - self._last_fire
-        return time_since_last_fire >= self._weapon_cooldown
-
-    def set_last_fire(self) -> None:
-        """Set timer for weapon cooldown."""
-        self._weapon_cooldown -= ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT
-        self._last_fire = time.get_ticks()
+    def reset_level(self) -> None:
+        """When player starts a new level."""
+        self._fire_rate_timer = Timer(ENEMY_WAVE_STARTING_FIRE_COOLDOWN)
 
 
 class Timer:
@@ -473,21 +465,21 @@ class Timer:
         cooldown:  time in milliseconds between each update"""
         self._cooldown = cooldown
         self._last_update = START_TIME
-    
+
     @property
     def cooldown(self) -> int:
         """Return the cooldown time in milliseconds."""
         return self._cooldown
-    
+
     @cooldown.setter
     def cooldown(self, value:int) -> None:
         """Set the cooldown time in milliseconds."""
         self._cooldown = value
-    
+
     def reset(self) -> None:
         """Reset the timer."""
         self._last_update = time.get_ticks()
-    
+
     def is_ready(self) -> bool:
         """Check if the timer is ready for an action."""
         now = time.get_ticks()
@@ -816,11 +808,12 @@ class Euclides:
                 shot_sound.play()
 
             # shoot enemy projectiles
-            if self._hostile.is_ready_to_fire() and bool(self._hostile):
+            if self._hostile.fire_rate_timer.is_ready() and bool(self._hostile):
                 enemy = random.choice(list(self._hostile))  # choose a random member from the wave
                 self._hostile_fire.add(Projectile(enemy, ENEMY_PROJECTILE_STARTING_SPEED, self._player))
                 self._onscreen.add(self._hostile_fire)
-                self._hostile.set_last_fire()
+                self._hostile.fire_rate_timer.cooldown -= ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT
+                self._hostile.fire_rate_timer.reset()
 
             # check whether player's projectile hits an enemy
             self._fire.hit(self._hostile)
