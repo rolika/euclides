@@ -220,8 +220,8 @@ class Player(Spaceship):
     def __init__(self) -> None:
         """Initialize a triangle, representing the player."""
         super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POS)
-        self._last_fire = START_TIME
         self._fires = False  # player fires continously
+        self._fire_rate_timer = Timer(WEAPON_COOLDOWN)
 
     @property
     def fires(self) -> bool:
@@ -233,6 +233,11 @@ class Player(Spaceship):
         """Set player's firing state.
         state:  boolean value"""
         self._fires = state
+    
+    @property
+    def fire_rate_timer(self) -> bool:
+        """Return true if player can fire, otherwise false."""
+        return self._fire_rate_timer
 
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
@@ -261,16 +266,6 @@ class Player(Spaceship):
             self._bounce_off_sound.play()
             enemy.turn_dy()
             enemy.turn_dx()
-
-    def is_ready_to_fire(self) -> bool:
-        """Check player's ability to fire."""
-        now = time.get_ticks()
-        time_since_last_fire = now - self._last_fire
-        return time_since_last_fire >= WEAPON_COOLDOWN
-
-    def set_last_fire(self) -> None:
-        """Set timer for weapon cooldown."""
-        self._last_fire = time.get_ticks()
 
     def reset(self) -> None:
         """When player restarts the game."""
@@ -477,7 +472,7 @@ class Timer:
         """Initialize a timer object.
         cooldown:  time in milliseconds between each update"""
         self._cooldown = cooldown
-        self.reset()
+        self._last_update = START_TIME
     
     @property
     def cooldown(self) -> int:
@@ -814,10 +809,10 @@ class Euclides:
                 self._onscreen.add(self._hostile)
 
             # shoot player projectiles
-            if self._player.is_ready_to_fire() and self._player.fires:
+            if self._player.fire_rate_timer.is_ready() and self._player.fires:
                 self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED))
                 self._onscreen.add(self._fire)
-                self._player.set_last_fire()
+                self._player.fire_rate_timer.reset()
                 shot_sound.play()
 
             # shoot enemy projectiles
