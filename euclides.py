@@ -101,11 +101,11 @@ class Trig:
         # 'r +' means here that origin is the rectangle's middlepoint
         return [[int(r + r*math.sin(i*angle)), int(r + r*math.cos(i*angle))] for i in range(0, n)]
 
-    def offset(displacement:int, angle:float) -> tuple:
+    def offset(speed:int, angle:float) -> tuple:
         """Calculate delta x and delta y offset coordinates.
-        displacement:   displacement in pixel
-        angle:          angle in radians"""
-        return math.ceil(displacement*math.cos(angle)), math.ceil(displacement*math.sin(angle))
+        speed:  speed in pixel
+        angle:  angle in radians"""
+        return math.ceil(speed*math.cos(angle)), math.ceil(speed*math.sin(angle))
 
     def angle(origin:tuple, target:tuple) -> float:
         """Calculate the angle between two points. Return the angle as radians.
@@ -122,9 +122,9 @@ class Polygon(sprite.Sprite):
     This class has nothing else to do as to draw a certain sized and verticed regular polygon."""
     def __init__(self, size:int, n:int, pos:tuple) -> None:
         """Prepare a sprite containing the polygon.
-        size:           size of containing surface (rectangular area as the polygon is regular)
-        n:              number of vertices
-        pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)"""
+        size:   size of containing surface (rectangular area as the polygon is regular)
+        n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__()
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
@@ -154,9 +154,9 @@ class Spaceship(Polygon):
     with a projectile. Generally, the spaceship's hull value is the same as its polygon's vertices."""
     def __init__(self, size: int, n: int, pos:tuple) -> None:
         """Prepare a sprite containing the polygon.
-        size:           size of containing surface (rectangular area as the polygon is regular)
-        n:              number of vertices
-        pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)"""
+        size:   size of containing surface (rectangular area as the polygon is regular)
+        n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__(size, n, pos)
         self._hull = n
         self._fade = 255 // n  # each damage darkens the ship
@@ -190,15 +190,15 @@ class Spaceship(Polygon):
 
 class Enemy(Spaceship):
     """Enemies are regular polygons above triangles: rectangles, pentagons, hexagons etc."""
-    def __init__(self, size:int, n:int, pos:tuple, displacement:int, angle:float) -> None:
+    def __init__(self, size:int, n:int, pos:tuple, speed:int, angle:float) -> None:
         """Initialize an enemy polygon.
-        size:           size of containing surface (rectangular area as the polygon is regular)
-        n:              number of vertices
-        pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)
-        displacement:   displacement in pixel
-        angle:          beginning moving angle in radians"""
+        size:   size of containing surface (rectangular area as the polygon is regular)
+        n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)
+        speed:  speed in pixel
+        angle:  beginning moving angle in radians"""
         super().__init__(size, n, pos)
-        self._dx, self._dy = Trig.offset(displacement, angle)  # enemies move right away after spawning
+        self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
 
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
@@ -299,7 +299,7 @@ class Projectile(Polygon):
     def __init__(self, owner:Polygon, speed:int, target:Player=None) -> None:
         """The projectile needs to know who fired it off, to get its size, shape and start poisiton.
         owner:  player on enemy sprite
-        speed:  displacement in pixel
+        speed:  speed in pixel
         target: enemy's target"""
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
         angle = PI*1.5 if target is None else Trig.angle(owner.rect.center, target.rect.center)
