@@ -460,7 +460,7 @@ class Wave(OnScreen):
 
 
     def is_ready_to_fire(self) -> bool:
-        """Check player's ability to fire."""
+        """Check the swarm's ability to fire."""
         now = time.get_ticks()
         time_since_last_fire = now - self._last_fire
         return time_since_last_fire >= self._weapon_cooldown
