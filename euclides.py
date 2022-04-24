@@ -471,6 +471,35 @@ class Wave(OnScreen):
         self._last_fire = time.get_ticks()
 
 
+class Timer:
+    """Timer for the game."""
+    def __init__(self, cooldown:int) -> None:
+        """Initialize a timer object.
+        cooldown:  time in milliseconds between each update"""
+        self._cooldown = cooldown
+        self.reset()
+    
+    @property
+    def cooldown(self) -> int:
+        """Return the cooldown time in milliseconds."""
+        return self._cooldown
+    
+    @cooldown.setter
+    def cooldown(self, value:int) -> None:
+        """Set the cooldown time in milliseconds."""
+        self._cooldown = value
+    
+    def reset(self) -> None:
+        """Reset the timer."""
+        self._last_update = time.get_ticks()
+    
+    def is_ready(self) -> bool:
+        """Check if the timer is ready for an action."""
+        now = time.get_ticks()
+        time_since_last_update = now - self._last_update
+        return time_since_last_update >= self._cooldown
+
+
 class Swarm(OnScreen):
     """Sprite container for projectiles."""
     def __init__(self, *sprites:Enemy) -> None:
