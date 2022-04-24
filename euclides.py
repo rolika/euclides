@@ -212,6 +212,7 @@ class Enemy(Spaceship):
 
     def turn_dy(self) -> None:
         """Turn around vertical movement."""
+        self._dy = -self._dy
 
 
 class Player(Spaceship):
