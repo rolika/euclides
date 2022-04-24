@@ -128,24 +128,32 @@ class Polygon(sprite.Sprite):
         super().__init__()
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
-        self.image = pygame.Surface((size, size))
-        pygame.draw.polygon(self.image, WHITE, Trig.vertices(n, self.radius), 1)
+        self._image = pygame.Surface((size, size))
+        self.image.set_colorkey(self.image.get_at((0, 0)))
+        pygame.draw.polygon(self._image, WHITE, Trig.vertices(n, self.radius), 1)
          # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
          # this doesn't really matter in case of enemies and their bullets
-        self.image = self._rotate(180)
-        self.image.set_colorkey(self.image.get_at((0, 0)))
-        self.rect = self.image.get_rect()
-        self.rect.center = pos
+        self._original_image = self._image.copy()
+        self.rect = self._image.get_rect(center=pos)
+        self._rotate(180)
+    
+    @property
+    def image(self) -> pygame.Surface:
+        """Return the image of the polygon."""
+        return self._image
 
     @property
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
 
-    def _rotate(self, angle:float) -> pygame.Surface:
+    def _rotate(self, angle:float) -> None:
         """Rotate the polygon.
         angle:  angle in degrees"""
-        return pygame.transform.rotate(self.image, angle)
+        pos = self.rect.center
+        self._image = pygame.transform.rotate(self._original_image, angle)
+        self.rect = self._image.get_rect()
+        self.rect.center = pos
 
 
 class Spaceship(Polygon):
@@ -199,12 +207,16 @@ class Enemy(Spaceship):
         angle:  beginning moving angle in radians"""
         super().__init__(size, n, pos)
         self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
+        self._rotation_timer = Timer(1000)
 
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
+        if self._rotation_timer.is_ready():
+            self._rotate(10)
+            self._rotation_timer.reset()
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
