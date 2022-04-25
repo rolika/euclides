@@ -215,7 +215,8 @@ class Enemy(Spaceship):
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
         if self._rotation_timer.is_ready():
-            self._rotate(10)
+            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter
+            self._rotate(angle)
             self._rotation_timer.reset()
 
     def turn_dx(self) -> None:
@@ -477,6 +478,7 @@ class Timer:
         cooldown:  time in milliseconds between each update"""
         self._cooldown = cooldown
         self._last_update = START_TIME
+        self._counter = 1
 
     @property
     def cooldown(self) -> int:
@@ -487,13 +489,23 @@ class Timer:
     def cooldown(self, value:int) -> None:
         """Set the cooldown time in milliseconds."""
         self._cooldown = value
+    
+    @property
+    def counter(self) -> int:
+        """Return the counter."""
+        return self._counter
 
     def reset(self) -> None:
         """Reset the timer."""
         self._last_update = time.get_ticks()
+    
+    def reset_counter(self) -> None:
+        """Reset the counter."""
+        self._counter = 1
 
     def is_ready(self) -> bool:
         """Check if the timer is ready for an action."""
+        self._counter += 1
         now = time.get_ticks()
         time_since_last_update = now - self._last_update
         return time_since_last_update >= self._cooldown
