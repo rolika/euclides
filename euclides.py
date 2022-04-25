@@ -136,7 +136,7 @@ class Polygon(sprite.Sprite):
         # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
         # this doesn't really matter in case of enemies and their bullets
         self._rotate(180)
-    
+
     @property
     def image(self) -> pygame.Surface:
         """Return the image of the polygon."""
@@ -193,7 +193,7 @@ class Spaceship(Polygon):
 
     def _fadeout(self):
         """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        self.image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
+        self._original_image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
 
 
 class Enemy(Spaceship):
@@ -489,7 +489,7 @@ class Timer:
     def cooldown(self, value:int) -> None:
         """Set the cooldown time in milliseconds."""
         self._cooldown = value
-    
+
     @property
     def counter(self) -> int:
         """Return the counter."""
@@ -498,7 +498,7 @@ class Timer:
     def reset(self) -> None:
         """Reset the timer."""
         self._last_update = time.get_ticks()
-    
+
     def reset_counter(self) -> None:
         """Reset the counter."""
         self._counter = 1
