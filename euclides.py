@@ -129,7 +129,7 @@ class Polygon(sprite.Sprite):
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
         self._image = pygame.Surface((size, size))
-        self.image.set_colorkey(self.image.get_at((0, 0)))
+        self._image.set_colorkey(self.image.get_at((0, 0)))
         pygame.draw.polygon(self._image, WHITE, Trig.vertices(n, self.radius), 1)
         self._original_image = self._image.copy()
         self.rect = self._image.get_rect(center=pos)
@@ -207,7 +207,7 @@ class Enemy(Spaceship):
         angle:  beginning moving angle in radians"""
         super().__init__(size, n, pos)
         self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
-        self._rotation_timer = Timer(1000)
+        self._rotation_timer = Timer(speed)
 
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
@@ -215,7 +215,7 @@ class Enemy(Spaceship):
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
         if self._rotation_timer.is_ready():
-            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter
+            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
             self._rotate(angle)
             self._rotation_timer.reset()
 
