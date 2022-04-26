@@ -249,7 +249,7 @@ class Player(Spaceship):
 
     @property
     def fire_rate_timer(self) -> bool:
-        """Return true if player can fire, otherwise false."""
+        """Return the fire rate timer."""
         return self._fire_rate_timer
 
     def update(self, *args, **kwargs) -> None:
