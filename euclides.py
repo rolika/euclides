@@ -61,6 +61,40 @@ TITLE_MUSIC = "wav/title_music.wav"
 OVER_MUSIC = "wav/over_music.wav"
 
 
+def keep_on_screen(update:callable) -> callable:
+    """Decorator function.
+    Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and bounce the enemy off screen edges."""
+        if self.rect.left < 0:
+            self.rect.left = 0
+            self.turn_dx()
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH - 1
+            self.turn_dx()
+        if self.rect.top < 0:
+            self.rect.top = 0
+            self.turn_dy()
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT - 1
+            self.turn_dy()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def rotate(update:callable) -> callable:
+    """Decorator function.
+    Rotate the polygon by its angle. Vertical projectiles won't rotate."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and rotate the enemy polygon."""        
+        if self._dx and self._rotation_timer.is_ready():
+            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
+            self._rotate(angle)
+            self._rotation_timer.reset()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
 class State(enum.Enum):
     """Euclides game states"""
     QUIT = enum.auto()
@@ -80,11 +114,11 @@ class Trig:
         # 'r +' means here that origin is the rectangle's middlepoint
         return [[int(r + r*math.sin(i*angle)), int(r + r*math.cos(i*angle))] for i in range(0, n)]
 
-    def offset(displacement:int, angle:float) -> tuple:
+    def offset(speed:int, angle:float) -> tuple:
         """Calculate delta x and delta y offset coordinates.
-        displacement:   displacement in pixel
-        angle:          angle in radians"""
-        return math.ceil(displacement*math.cos(angle)), math.ceil(displacement*math.sin(angle))
+        speed:  speed in pixel
+        angle:  angle in radians"""
+        return math.ceil(speed*math.cos(angle)), math.ceil(speed*math.sin(angle))
 
     def angle(origin:tuple, target:tuple) -> float:
         """Calculate the angle between two points. Return the angle as radians.
@@ -101,25 +135,38 @@ class Polygon(sprite.Sprite):
     This class has nothing else to do as to draw a certain sized and verticed regular polygon."""
     def __init__(self, size:int, n:int, pos:tuple) -> None:
         """Prepare a sprite containing the polygon.
-        size:           size of containing surface (rectangular area as the polygon is regular)
-        n:              number of vertices
-        pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)"""
+        size:   size of containing surface (rectangular area as the polygon is regular)
+        n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__()
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
-        self.image = pygame.Surface((size, size))
-        pygame.draw.polygon(self.image, WHITE, Trig.vertices(n, self.radius), 1)
-         # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
-         # this doesn't really matter in case of enemies and their bullets
-        self.image = pygame.transform.rotate(self.image, 180)
-        self.image.set_colorkey(self.image.get_at((0, 0)))
-        self.rect = self.image.get_rect()
-        self.rect.center = pos
+        self._image = pygame.Surface((size, size))
+        self._image.set_colorkey(self.image.get_at((0, 0)))
+        pygame.draw.polygon(self._image, WHITE, Trig.vertices(n, self.radius), 1)
+        self._original_image = self._image.copy()
+        self.rect = self._image.get_rect(center=pos)
+        # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
+        # this doesn't really matter in case of enemies and their bullets
+        self._rotate(180)
+
+    @property
+    def image(self) -> pygame.Surface:
+        """Return the image of the polygon."""
+        return self._image
 
     @property
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
+
+    def _rotate(self, angle:float) -> None:
+        """Rotate the polygon.
+        angle:  angle in degrees"""
+        pos = self.rect.center
+        self._image = pygame.transform.rotate(self._original_image, angle)
+        self.rect = self._image.get_rect()
+        self.rect.center = pos
 
 
 class Spaceship(Polygon):
@@ -128,9 +175,9 @@ class Spaceship(Polygon):
     with a projectile. Generally, the spaceship's hull value is the same as its polygon's vertices."""
     def __init__(self, size: int, n: int, pos:tuple) -> None:
         """Prepare a sprite containing the polygon.
-        size:           size of containing surface (rectangular area as the polygon is regular)
-        n:              number of vertices
-        pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)"""
+        size:   size of containing surface (rectangular area as the polygon is regular)
+        n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__(size, n, pos)
         self._hull = n
         self._fade = 255 // n  # each damage darkens the ship
@@ -159,24 +206,26 @@ class Spaceship(Polygon):
 
     def _fadeout(self):
         """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        self.image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
+        self._original_image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
 
 
 class Enemy(Spaceship):
     """Enemies are regular polygons above triangles: rectangles, pentagons, hexagons etc."""
-    def __init__(self, size:int, n:int, pos:tuple, displacement:int, angle:float) -> None:
+    def __init__(self, size:int, n:int, pos:tuple, speed:int, angle:float) -> None:
         """Initialize an enemy polygon.
-        size:           size of containing surface (rectangular area as the polygon is regular)
-        n:              number of vertices
-        pos:            tuple of x, y coordinates, where the polygon should apper (rect.center)
-        displacement:   displacement in pixel
-        angle:          beginning moving angle in radians"""
+        size:   size of containing surface (rectangular area as the polygon is regular)
+        n:      number of vertices
+        pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)
+        speed:  speed in pixel
+        angle:  beginning moving angle in radians"""
         super().__init__(size, n, pos)
-        self._dx, self._dy = Trig.offset(displacement, angle)  # enemies move right away after spawning
+        self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
+        self._rotation_timer = Timer(speed)
 
+    @rotate
+    @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        self._keep_on_screen()
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
 
@@ -188,29 +237,14 @@ class Enemy(Spaceship):
         """Turn around vertical movement."""
         self._dy = -self._dy
 
-    def _keep_on_screen(self) -> None:
-        """Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
-        if self.rect.left < 0:
-            self.rect.left = 0
-            self.turn_dx()
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH - 1
-            self.turn_dx()
-        if self.rect.top < 0:
-            self.rect.top = 0
-            self.turn_dy()
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT - 1
-            self.turn_dy()
-
 
 class Player(Spaceship):
     """Player is represented by a regular triangle-shaped spaceship."""
     def __init__(self) -> None:
         """Initialize a triangle, representing the player."""
         super().__init__(PLAYER_SIZE, PLAYER_VERTICES, PLAYER_START_POS)
-        self._last_fire = START_TIME
         self._fires = False  # player fires continously
+        self._fire_rate_timer = Timer(WEAPON_COOLDOWN)
 
     @property
     def fires(self) -> bool:
@@ -222,6 +256,11 @@ class Player(Spaceship):
         """Set player's firing state.
         state:  boolean value"""
         self._fires = state
+
+    @property
+    def fire_rate_timer(self) -> bool:
+        """Return the fire rate timer."""
+        return self._fire_rate_timer
 
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
@@ -251,18 +290,8 @@ class Player(Spaceship):
             enemy.turn_dy()
             enemy.turn_dx()
 
-    def is_ready_to_fire(self) -> bool:
-        """Check player's ability to fire."""
-        now = time.get_ticks()
-        time_since_last_fire = now - self._last_fire
-        return time_since_last_fire >= WEAPON_COOLDOWN
-
-    def set_last_fire(self) -> None:
-        """Set timer for weapon cooldown."""
-        self._last_fire = time.get_ticks()
-
     def reset(self) -> None:
-        """When player restarts the game."""
+        """Player restarts the game."""
         self._hull = PLAYER_VERTICES
         self.rect.center = PLAYER_START_POS
 
@@ -289,12 +318,14 @@ class Projectile(Polygon):
     def __init__(self, owner:Polygon, speed:int, target:Player=None) -> None:
         """The projectile needs to know who fired it off, to get its size, shape and start poisiton.
         owner:  player on enemy sprite
-        speed:  displacement in pixel
+        speed:  speed in pixel
         target: enemy's target"""
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
         angle = PI*1.5 if target is None else Trig.angle(owner.rect.center, target.rect.center)
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
+        self._rotation_timer = Timer(speed)
 
+    @rotate
     def update(self, *args, **kwargs) -> None:
         """Update the projectile sprite."""
         self.rect.centerx += self._dx
@@ -419,8 +450,13 @@ class Wave(OnScreen):
         self.reset_game()
 
     @property
+    def fire_rate_timer(self) -> int:
+        """Return the fire rate timer."""
+        return self._fire_rate_timer
+
+    @property
     def score(self) -> int:
-        """Return the waves calculated score."""
+        """Return the wave's calculated score."""
         return self._score
 
     def increase_score(self, value:int) -> None:
@@ -442,22 +478,49 @@ class Wave(OnScreen):
         self._score = 0
         self.reset_level()
 
-    def reset_level(self):
-        """When player reaches a new level."""
-        self._last_fire = time.get_ticks()
-        self._weapon_cooldown = ENEMY_WAVE_STARTING_FIRE_COOLDOWN
+    def reset_level(self) -> None:
+        """When player starts a new level."""
+        self._fire_rate_timer = Timer(ENEMY_WAVE_STARTING_FIRE_COOLDOWN)
 
 
-    def is_ready_to_fire(self) -> bool:
-        """Check player's ability to fire."""
+class Timer:
+    """Timer for the game."""
+    def __init__(self, cooldown:int) -> None:
+        """Initialize a timer object.
+        cooldown:  time in milliseconds between each update"""
+        self._cooldown = cooldown
+        self._last_update = START_TIME
+        self._counter = 1
+
+    @property
+    def cooldown(self) -> int:
+        """Return the cooldown time in milliseconds."""
+        return self._cooldown
+
+    @cooldown.setter
+    def cooldown(self, value:int) -> None:
+        """Set the cooldown time in milliseconds."""
+        self._cooldown = value
+
+    @property
+    def counter(self) -> int:
+        """Return the counter."""
+        return self._counter
+
+    def reset(self) -> None:
+        """Reset the timer."""
+        self._last_update = time.get_ticks()
+
+    def reset_counter(self) -> None:
+        """Reset the counter."""
+        self._counter = 1
+
+    def is_ready(self) -> bool:
+        """Check if the timer is ready for an action."""
+        self._counter += 1
         now = time.get_ticks()
-        time_since_last_fire = now - self._last_fire
-        return time_since_last_fire >= self._weapon_cooldown
-
-    def set_last_fire(self) -> None:
-        """Set timer for weapon cooldown."""
-        self._weapon_cooldown -= ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT
-        self._last_fire = time.get_ticks()
+        time_since_last_update = now - self._last_update
+        return time_since_last_update >= self._cooldown
 
 
 class Swarm(OnScreen):
@@ -774,18 +837,19 @@ class Euclides:
                 self._onscreen.add(self._hostile)
 
             # shoot player projectiles
-            if self._player.is_ready_to_fire() and self._player.fires:
+            if self._player.fire_rate_timer.is_ready() and self._player.fires:
                 self._fire.add(Projectile(self._player, PLAYER_PROJECTILE_SPEED))
                 self._onscreen.add(self._fire)
-                self._player.set_last_fire()
+                self._player.fire_rate_timer.reset()
                 shot_sound.play()
 
             # shoot enemy projectiles
-            if self._hostile.is_ready_to_fire() and bool(self._hostile):
+            if self._hostile.fire_rate_timer.is_ready() and bool(self._hostile):
                 enemy = random.choice(list(self._hostile))  # choose a random member from the wave
                 self._hostile_fire.add(Projectile(enemy, ENEMY_PROJECTILE_STARTING_SPEED, self._player))
                 self._onscreen.add(self._hostile_fire)
-                self._hostile.set_last_fire()
+                self._hostile.fire_rate_timer.cooldown -= ENEMY_WAVE_FIRE_COOLDOWN_DECREMENT
+                self._hostile.fire_rate_timer.reset()
 
             # check whether player's projectile hits an enemy
             self._fire.hit(self._hostile)
