@@ -82,6 +82,19 @@ def keep_on_screen(update:callable) -> callable:
     return wrapper
 
 
+def rotate(update:callable) -> callable:
+    """Decorator function.
+    Rotate the polygon by its angle. Vertical projectiles won't rotate."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and rotate the enemy polygon."""        
+        if self._dx and self._rotation_timer.is_ready():
+            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
+            self._rotate(angle)
+            self._rotation_timer.reset()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
 class State(enum.Enum):
     """Euclides game states"""
     QUIT = enum.auto()
@@ -209,15 +222,12 @@ class Enemy(Spaceship):
         self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
         self._rotation_timer = Timer(speed)
 
+    @rotate
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
-        if self._rotation_timer.is_ready():
-            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
-            self._rotate(angle)
-            self._rotation_timer.reset()
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
@@ -281,7 +291,7 @@ class Player(Spaceship):
             enemy.turn_dx()
 
     def reset(self) -> None:
-        """When player restarts the game."""
+        """Player restarts the game."""
         self._hull = PLAYER_VERTICES
         self.rect.center = PLAYER_START_POS
 
@@ -313,7 +323,9 @@ class Projectile(Polygon):
         super().__init__(owner.rect.width // 4, owner.n, owner.rect.center)
         angle = PI*1.5 if target is None else Trig.angle(owner.rect.center, target.rect.center)
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
+        self._rotation_timer = Timer(speed)
 
+    @rotate
     def update(self, *args, **kwargs) -> None:
         """Update the projectile sprite."""
         self.rect.centerx += self._dx
