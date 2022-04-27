@@ -89,7 +89,10 @@ def rotate(update:callable) -> callable:
         """Call the update function and rotate the enemy polygon."""        
         if self._dx and self._rotation_timer.is_ready():
             angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
-            self._rotate(angle)
+            pos = self.rect.center
+            self._image = pygame.transform.rotate(self._original_image, angle)
+            self.rect = self._image.get_rect()
+            self.rect.center = pos
             self._rotation_timer.reset()
         update(self, *args, **kwargs)
     return wrapper
@@ -144,11 +147,11 @@ class Polygon(sprite.Sprite):
         self._image = pygame.Surface((size, size))
         self._image.set_colorkey(self.image.get_at((0, 0)))
         pygame.draw.polygon(self._image, WHITE, Trig.vertices(n, self.radius), 1)
-        self._original_image = self._image.copy()
         self.rect = self._image.get_rect(center=pos)
         # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
         # this doesn't really matter in case of enemies and their bullets
-        self._rotate(180)
+        self._image = pygame.transform.rotate(self._image, 180)
+        self._original_image = self._image.copy()
 
     @property
     def image(self) -> pygame.Surface:
@@ -159,14 +162,6 @@ class Polygon(sprite.Sprite):
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
-
-    def _rotate(self, angle:float) -> None:
-        """Rotate the polygon.
-        angle:  angle in degrees"""
-        pos = self.rect.center
-        self._image = pygame.transform.rotate(self._original_image, angle)
-        self.rect = self._image.get_rect()
-        self.rect.center = pos
 
 
 class Spaceship(Polygon):
