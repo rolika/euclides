@@ -397,33 +397,6 @@ class HiScore(Score):
         self._text = self._format("hiscore", score)
 
 
-class UIButton(PlainText):
-    """Button-like user interface."""
-    def __init__(self, font_name, font_size, text, font_color, pos, action) -> None:
-        self._action = action
-        self._mouse_over = False
-        highlighted_font = font.Font(font_name, font_size*2)
-        self._highlighted_image = highlighted_font.render(text, True, font_color)
-        self._highlighted_rect = self._highlighted_image.get_rect(center=pos)
-        super().__init__(font_name, font_size, text, font_color, pos)
-
-    @property
-    def image(self):
-        return self._highlighted_image if self._mouse_over else super().image
-
-    @property
-    def rect(self):
-        return self._highlighted_rect if self._mouse_over else super().rect
-
-    def update(self, *args, **kwargs):
-        mouse_pos = kwargs.pop("mouse_pos", None)
-        assert mouse_pos
-        if self.rect.collidepoint(mouse_pos):
-            self._mouse_over = True
-        else:
-            self._mouse_over = False
-
-
 class OnScreen(sprite.RenderUpdates):
     """Container for on-screen sprite objects."""
     def __init__(self, *sprites:Polygon) -> None:
@@ -877,9 +850,9 @@ class Euclides:
     def _end(self, screen) -> State:
         """Show game over screen.
         screen: pygame display"""
-        game_over = UIButton("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS, State.INTRO)
+        game_over_text = PlainText("font/RubikMonoOne-Regular.ttf", 40, "GAME OVER", WHITE, GAME_OVER_POS)
         score = self._hostile.score + self._hostile_fire.score
-        self._set_screen(self._score, self._highscore, game_over)
+        self._set_screen(self._score, self._highscore, game_over_text)
         text = None
         if self._hall_of_fame.is_new_hiscore(score):
             text = PlainText("font/ShareTechMono-Regular.ttf", 30, "A new hi-score!", WHITE, NEWHI_POS)
@@ -896,7 +869,7 @@ class Euclides:
         while True:
             screen.fill(BLACK)
 
-            if game_over.rect.collidepoint(mouse.get_pos()):
+            if self._player.rect.collidepoint(mouse.get_pos()):
                 self._energy_hum.play()
             else:
                 self._energy_hum.fadeout(500)
@@ -907,7 +880,7 @@ class Euclides:
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:  # exit by pressing escape button
                         return State.QUIT
-                if event.type == MOUSEBUTTONUP and game_over.rect.collidepoint(mouse.get_pos()):
+                if event.type == MOUSEBUTTONUP and self._player.rect.collidepoint(mouse.get_pos()):
                     self._energy_hum.stop()
                     if text:
                         self._enter_name(score)
