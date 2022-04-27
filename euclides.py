@@ -256,6 +256,11 @@ class Player(Spaceship):
     def fire_rate_timer(self) -> bool:
         """Return the fire rate timer."""
         return self._fire_rate_timer
+    
+    def damage(self):
+        """Override spaciship class damage method."""
+        super().damage()
+        self._image = self._original_image.copy()
 
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
