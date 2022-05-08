@@ -180,8 +180,6 @@ class Spaceship(Polygon):
         # setup sounds
         self._ship_damage_sound = mixer.Sound(ENEMY_HULL_DAMAGE)
         self._ship_damage_sound.set_volume(0.5)
-        self._ship_destroyed_sound = mixer.Sound(EXPLOSION)
-        self._ship_destroyed_sound.set_volume(1)
         self._bounce_off_sound = mixer.Sound(BOUNCE_OFF)
         self._bounce_off_sound.set_volume(0.5)
 
@@ -195,9 +193,6 @@ class Spaceship(Polygon):
         self._hull -= 1
         self._fadeout()
         self._ship_damage_sound.play()
-        if self.is_destroyed:
-            self._ship_destroyed_sound.play()
-            self.kill()
 
     def _fadeout(self):
         """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
@@ -404,7 +399,7 @@ class OnScreen(sprite.RenderUpdates):
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
 
-    def update(self, *args, **kwargs) -> None:
+    def update(self, *args, **kwargs):
         """Handle sprites within the group.
         screen: game's display Surface"""
         screen = kwargs.pop("screen", None)
@@ -690,6 +685,8 @@ class Euclides:
         self._engine_startup.set_volume(0.5)
         self._energy_hum = mixer.Sound("wav/energy_hum.wav")
         self._energy_hum.set_volume(0.5)
+        self._ship_destroyed_sound = mixer.Sound(EXPLOSION)
+        self._ship_destroyed_sound.set_volume(1)
 
         self._main()
 
@@ -835,6 +832,14 @@ class Euclides:
 
             # check player collisions with enemy craft
             self._hostile.contact(self._player)
+
+            # check destroyed starhips
+            for ship in self._hostile:
+                if ship.is_destroyed:
+                    ship.kill()
+                    self._ship_destroyed_sound.play()
+            if self._player.is_destroyed:
+                self._player.kill()
 
             # check if player is still alive
             if not self._player.alive():
