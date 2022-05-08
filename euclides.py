@@ -875,6 +875,8 @@ class Euclides:
             # check exploding ships's state
             for ship in self._exploding:
                 ship.explode()
+                ship.radius *= 1.1
+                ship.draw_polygon(ship.rect.center)
                 if ship.exploded:
                     ship.kill()
                     self._ship_destroyed_sound.play()
