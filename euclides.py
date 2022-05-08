@@ -235,9 +235,7 @@ class Enemy(Spaceship):
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        if self.is_exploding:
-            self.explode()
-        else:
+        if not self.is_exploding:
             self.rect.centerx += self._dx
             self.rect.centery += self._dy
 
