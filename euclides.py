@@ -191,6 +191,7 @@ class Spaceship(Polygon):
     @property
     def is_destroyed(self) -> bool:
         """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
+        self._center_of_explosion = self.rect.center
         return self._hull < 1
     
     @property
@@ -202,6 +203,11 @@ class Spaceship(Polygon):
     def exploded(self) -> bool:
         """Retrun if the ship has exploded."""
         return self._exploding <= 0
+    
+    @property
+    def center_of_explosion(self) -> tuple:
+        """Return the center of the explosion."""
+        return self._center_of_explosion
     
     def explode(self) -> None:
         """Explode the ship, that is, advance the explosion frame."""
@@ -874,7 +880,7 @@ class Euclides:
             for ship in self._exploding:
                 ship.explode()
                 ship.radius *= 1.1
-                ship.draw_polygon(ship.rect.center)
+                ship.draw_polygon(ship.center_of_explosion)
                 if ship.exploded:
                     ship.kill()
                     self._ship_destroyed_sound.play()
