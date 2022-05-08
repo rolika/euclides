@@ -176,6 +176,7 @@ class Spaceship(Polygon):
         super().__init__(size, n, pos)
         self._hull = n
         self._fade = 255 // n  # each damage darkens the ship
+        self._exploding = n + 1
 
         # setup sounds
         self._ship_damage_sound = mixer.Sound(ENEMY_HULL_DAMAGE)
@@ -187,6 +188,20 @@ class Spaceship(Polygon):
     def is_destroyed(self) -> bool:
         """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
         return self._hull < 1
+    
+    @property
+    def is_exploding(self) -> bool:
+        """Return True if ship is exploding, otherwise False."""
+        return self._exploding <= self._n and self._exploding > 0
+    
+    @property
+    def exploded(self) -> bool:
+        """Retrun if the ship has exploded."""
+        return self._exploding <= 0
+    
+    def explode(self) -> None:
+        """Explode the ship, that is, advance the explosion frame."""
+        self._exploding -= 1
 
     def damage(self) -> None:
         """Reduce hull by one."""
@@ -216,8 +231,11 @@ class Enemy(Spaceship):
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
+        if self.is_exploding:
+            self.explode()
+        else:
+            self.rect.centerx += self._dx
+            self.rect.centery += self._dy
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
@@ -847,10 +865,14 @@ class Euclides:
                 if ship.is_destroyed:
                     self._hostile.remove(ship)
                     self._exploding.add(ship)
-                    ship.kill()
-                    self._ship_destroyed_sound.play()
             if self._player.is_destroyed:
                 self._player.kill()
+            
+            # check exploding ships's state
+            for ship in self._exploding:
+                if ship.exploded:
+                    ship.kill()
+                    self._ship_destroyed_sound.play()
 
             # check if player is still alive
             if not self._player.alive():
