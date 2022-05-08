@@ -409,6 +409,14 @@ class OnScreen(sprite.RenderUpdates):
         return changed
 
 
+class Exploding(OnScreen):
+    """Container for exploding sprite objects."""
+    def __init__(self, *sprites:Polygon) -> None:
+        """Uses default initialization.
+        sprites:    any number of sprite objects"""
+        super().__init__(*sprites)
+
+
 class Wave(OnScreen):
     """Sprite container for enemies."""
     def __init__(self, *sprites:Enemy) -> None:
@@ -678,6 +686,7 @@ class Euclides:
         self._fire = Swarm()  # container for player's projectiles
         self._hostile = Wave()  # container for enemy spacecrafts
         self._hostile_fire = Swarm()  # container for enemy projectiles
+        self._exploding = Exploding()  # container for exploding spacecrafts
         self._onscreen = OnScreen()  # container for sprites on screen
 
         # setup sound
@@ -763,7 +772,7 @@ class Euclides:
     def _play(self, screen) -> State:
         """Play the game.
         screen: pygame display"""
-        self._set_screen(self._score, self._highscore, self._hostile)
+        self._set_screen(self._score, self._highscore, self._hostile, self._exploding)
 
         size = ENEMY_STARTING_SIZE
         n = 3
@@ -836,6 +845,8 @@ class Euclides:
             # check destroyed starhips
             for ship in self._hostile:
                 if ship.is_destroyed:
+                    self._hostile.remove(ship)
+                    self._exploding.add(ship)
                     ship.kill()
                     self._ship_destroyed_sound.play()
             if self._player.is_destroyed:
