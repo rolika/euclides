@@ -60,6 +60,8 @@ BOUNCE_OFF = "wav/bounce_off.wav"
 TITLE_MUSIC = "wav/title_music.wav"
 OVER_MUSIC = "wav/over_music.wav"
 
+EXPLOSION_COOLDOWN = 50
+
 
 def keep_on_screen(update:callable) -> callable:
     """Decorator function.
@@ -133,6 +135,46 @@ class Trig:
         return math.atan2(dy, dx)
 
 
+class Timer:
+    """Timer for the game."""
+    def __init__(self, cooldown:int) -> None:
+        """Initialize a timer object.
+        cooldown:  time in milliseconds between each update"""
+        self._cooldown = cooldown
+        self._last_update = START_TIME
+        self._counter = 1
+
+    @property
+    def cooldown(self) -> int:
+        """Return the cooldown time in milliseconds."""
+        return self._cooldown
+
+    @cooldown.setter
+    def cooldown(self, value:int) -> None:
+        """Set the cooldown time in milliseconds."""
+        self._cooldown = value
+
+    @property
+    def counter(self) -> int:
+        """Return the counter."""
+        return self._counter
+
+    def reset(self) -> None:
+        """Reset the timer."""
+        self._last_update = time.get_ticks()
+
+    def reset_counter(self) -> None:
+        """Reset the counter."""
+        self._counter = 1
+
+    def is_ready(self) -> bool:
+        """Check if the timer is ready for an action."""
+        self._counter += 1
+        now = time.get_ticks()
+        time_since_last_update = now - self._last_update
+        return time_since_last_update >= self._cooldown
+
+
 class Polygon(sprite.Sprite):
     """All game objects in Euclides are regular polygons.
     This class has nothing else to do as to draw a certain sized and verticed regular polygon."""
@@ -147,6 +189,10 @@ class Polygon(sprite.Sprite):
         self._image = pygame.Surface((size, size))
         self._image.set_colorkey(self.image.get_at((0, 0)))
         self.draw_polygon(pos)
+        # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
+        # this doesn't really matter in case of enemies and their bullets
+        self._image = pygame.transform.rotate(self._image, 180)
+        self._original_image = self._image.copy()
 
     @property
     def image(self) -> pygame.Surface:
@@ -162,10 +208,6 @@ class Polygon(sprite.Sprite):
         """Draw the polygon."""
         pygame.draw.polygon(self._image, WHITE, Trig.vertices(self._n, self.radius), 1)
         self.rect = self._image.get_rect(center=pos)
-        # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
-        # this doesn't really matter in case of enemies and their bullets
-        self._image = pygame.transform.rotate(self._image, 180)
-        self._original_image = self._image.copy()
 
 
 class Spaceship(Polygon):
@@ -181,6 +223,7 @@ class Spaceship(Polygon):
         self._hull = n
         self._fade = 255 // n  # each damage darkens the ship
         self._exploding = n + 1
+        self._explosion_timer = Timer(EXPLOSION_COOLDOWN)
 
         # setup sounds
         self._ship_damage_sound = mixer.Sound(ENEMY_HULL_DAMAGE)
@@ -209,6 +252,11 @@ class Spaceship(Polygon):
         """Return the center of the explosion."""
         return self._center_of_explosion
     
+    @property
+    def explosion_timer(self) -> Timer:
+        """Return the timer for the explosion."""
+        return self._explosion_timer
+    
     def explode(self) -> None:
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
@@ -236,6 +284,11 @@ class Enemy(Spaceship):
         super().__init__(size, n, pos)
         self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
         self._rotation_timer = Timer(speed)
+    
+    @property
+    def rotation_timer(self) -> Timer:
+        """Return the rotation timer."""
+        return self._rotation_timer
 
     @rotate
     @keep_on_screen
@@ -483,46 +536,6 @@ class Wave(OnScreen):
     def reset_level(self) -> None:
         """When player starts a new level."""
         self._fire_rate_timer = Timer(ENEMY_WAVE_STARTING_FIRE_COOLDOWN)
-
-
-class Timer:
-    """Timer for the game."""
-    def __init__(self, cooldown:int) -> None:
-        """Initialize a timer object.
-        cooldown:  time in milliseconds between each update"""
-        self._cooldown = cooldown
-        self._last_update = START_TIME
-        self._counter = 1
-
-    @property
-    def cooldown(self) -> int:
-        """Return the cooldown time in milliseconds."""
-        return self._cooldown
-
-    @cooldown.setter
-    def cooldown(self, value:int) -> None:
-        """Set the cooldown time in milliseconds."""
-        self._cooldown = value
-
-    @property
-    def counter(self) -> int:
-        """Return the counter."""
-        return self._counter
-
-    def reset(self) -> None:
-        """Reset the timer."""
-        self._last_update = time.get_ticks()
-
-    def reset_counter(self) -> None:
-        """Reset the counter."""
-        self._counter = 1
-
-    def is_ready(self) -> bool:
-        """Check if the timer is ready for an action."""
-        self._counter += 1
-        now = time.get_ticks()
-        time_since_last_update = now - self._last_update
-        return time_since_last_update >= self._cooldown
 
 
 class Swarm(OnScreen):
@@ -878,9 +891,11 @@ class Euclides:
             
             # check exploding ships's state
             for ship in self._exploding:
-                ship.explode()
-                ship.radius *= 1.1
-                ship.draw_polygon(ship.center_of_explosion)
+                if ship.explosion_timer.is_ready():
+                    ship.explode()
+                    ship.radius *= 1.1
+                    ship.draw_polygon(ship.center_of_explosion)
+                    ship.explosion_timer.reset()
                 if ship.exploded:
                     ship.kill()
                     self._ship_destroyed_sound.play()
