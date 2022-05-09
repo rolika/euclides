@@ -260,6 +260,9 @@ class Spaceship(Polygon):
     def explode(self) -> None:
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
+        self.radius *= 1.1
+        self.draw_polygon(self.center_of_explosion)
+        self.explosion_timer.reset()
 
     def damage(self) -> None:
         """Reduce hull by one."""
@@ -294,9 +297,8 @@ class Enemy(Spaceship):
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        if not self.is_exploding:
-            self.rect.centerx += self._dx
-            self.rect.centery += self._dy
+        self.rect.centerx += self._dx
+        self.rect.centery += self._dy
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
@@ -893,9 +895,6 @@ class Euclides:
             for ship in self._exploding:
                 if ship.explosion_timer.is_ready():
                     ship.explode()
-                    ship.radius *= 1.1
-                    ship.draw_polygon(ship.center_of_explosion)
-                    ship.explosion_timer.reset()
                 if ship.exploded:
                     ship.kill()
                     self._ship_destroyed_sound.play()
