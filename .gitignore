@@ -1,2 +1,5 @@
 *.db
 .venv
+*.bak
+*.dir
+*.dat
