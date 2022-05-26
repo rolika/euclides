@@ -101,6 +101,18 @@ def rotate(update:callable) -> callable:
     return wrapper
 
 
+def remove(update:callable) -> callable:
+    """Decorator function.
+    Remove the sprite from its group if it goes off the screen."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and remove the sprite from its group if it goes off the screen."""
+        if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
+            self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
+            self.kill()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
 class State(enum.Enum):
     """Euclides game states"""
     QUIT = enum.auto()
@@ -187,6 +199,7 @@ class Polygon(sprite.Sprite):
         super().__init__()
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
+        self._dx = self._dy = 0
         self._image = pygame.Surface((size, size))
         self._image.set_colorkey(self.image.get_at((0, 0)))
         self.draw_polygon(pos)
@@ -204,6 +217,11 @@ class Polygon(sprite.Sprite):
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
+    
+    def update(self, *args, **kwargs) -> None:
+        """Update the polygon."""
+        self.rect.centerx += self._dx
+        self.rect.centery += self._dy
     
     def draw_polygon(self, pos:tuple) -> None:
         """Draw the polygon."""
@@ -298,8 +316,7 @@ class Enemy(Spaceship):
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
+        super().update(*args, **kwargs)
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
@@ -402,15 +419,11 @@ class Projectile(Polygon):
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
         self._rotation_timer = Timer(speed)
 
+    @remove
     @rotate
     def update(self, *args, **kwargs) -> None:
         """Update the projectile sprite."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
-        # remove from group if it leaves the screen
-        if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
-            self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
-            self.kill()
+        super().update(*args, **kwargs)
 
 
 class PlainText(sprite.Sprite):
