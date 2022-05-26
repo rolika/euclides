@@ -64,7 +64,7 @@ EXPLOSION_COOLDOWN = 50
 BLAST_RADIUS_INCREASE = 1.05
 
 
-def keep_on_screen(update:callable) -> callable:
+def knockback(update:callable) -> callable:
     """Decorator function.
     Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
     def wrapper(self, *args, **kwargs) -> None:
@@ -101,7 +101,7 @@ def rotate(update:callable) -> callable:
     return wrapper
 
 
-def remove(update:callable) -> callable:
+def remove_offscreen(update:callable) -> callable:
     """Decorator function.
     Remove the sprite from its group if it goes off the screen."""
     def wrapper(self, *args, **kwargs) -> None:
@@ -109,6 +109,35 @@ def remove(update:callable) -> callable:
         if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
             self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
             self.kill()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def keep_on_screen(update:callable) -> callable:
+    """Decorator function.
+    Keep the sprite on screen."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and keep the sprite on screen."""
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
+        if self.rect.top < 0:
+            self.rect.top = 0
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def follow_mouse(update:callable) -> callable:
+    """Decorator function.
+    Follow the mouse cursor."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and follow the mouse cursor in play mode."""
+        state = kwargs.pop("state", None)
+        if state == State.PLAY:
+            self.rect.center = mouse.get_pos()
         update(self, *args, **kwargs)
     return wrapper
 
@@ -313,7 +342,7 @@ class Enemy(Spaceship):
         return self._rotation_timer
 
     @rotate
-    @keep_on_screen
+    @knockback
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
         super().update(*args, **kwargs)
@@ -356,11 +385,11 @@ class Player(Spaceship):
         super().damage()
         self._image = self._original_image.copy()
 
+    @follow_mouse
+    @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
-        state = kwargs.pop("state", None)
-        if state == State.PLAY:
-            self._keep_on_screen(*mouse.get_pos())
+        pass
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
@@ -389,23 +418,6 @@ class Player(Spaceship):
         self._hull = PLAYER_VERTICES
         self.rect.center = PLAYER_START_POS
 
-    def _keep_on_screen(self, x:int, y:int) -> None:
-        """Always keep the whole player polygon on screen.
-        x:  intended next horizontal center coordinate
-        y:  intended next vertical center coordinate"""
-        edge_left = edge_top = self.rect.width // 2
-        edge_right = SCREEN_WIDTH - edge_left
-        edge_bottom = SCREEN_HEIGHT - edge_top
-        if x < edge_left:
-            x = edge_left
-        if x > edge_right:
-            x = edge_right
-        if y < edge_top:
-            y = edge_top
-        if y > edge_bottom:
-            y = edge_bottom
-        self.rect.center = (x, y)
-
 
 class Projectile(Polygon):
     """The polygon shoots same shaped projectiles."""
@@ -419,7 +431,7 @@ class Projectile(Polygon):
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
         self._rotation_timer = Timer(speed)
 
-    @remove
+    @remove_offscreen
     @rotate
     def update(self, *args, **kwargs) -> None:
         """Update the projectile sprite."""
