@@ -64,7 +64,7 @@ EXPLOSION_COOLDOWN = 50
 BLAST_RADIUS_INCREASE = 1.05
 
 
-def keep_on_screen(update:callable) -> callable:
+def knockback(update:callable) -> callable:
     """Decorator function.
     Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
     def wrapper(self, *args, **kwargs) -> None:
@@ -91,12 +91,51 @@ def rotate(update:callable) -> callable:
     def wrapper(self, *args, **kwargs) -> None:
         """Call the update function and rotate the enemy polygon."""        
         if self._dx and self._rotation_timer.is_ready():
-            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
-            pos = self.rect.center
-            self._image = pygame.transform.rotate(self._original_image, angle)
-            self.rect = self._image.get_rect()
-            self.rect.center = pos
+            self.angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
+            self.draw_polygon()
             self._rotation_timer.reset()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def remove_offscreen(update:callable) -> callable:
+    """Decorator function.
+    Remove the sprite from its group if it goes off the screen."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and remove the sprite from its group if it goes off the screen."""
+        if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
+            self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
+            self.kill()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def keep_on_screen(update:callable) -> callable:
+    """Decorator function.
+    Keep the sprite on screen."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and keep the sprite on screen."""
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
+        if self.rect.top < 0:
+            self.rect.top = 0
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def follow_mouse(update:callable) -> callable:
+    """Decorator function.
+    Follow the mouse cursor."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and follow the mouse cursor in play mode."""
+        state = kwargs.pop("state", None)
+        if state == State.PLAY:
+            self._dx = (mouse.get_pos()[0] - self.rect.centerx) // 2
+            self._dy = (mouse.get_pos()[1] - self.rect.centery) // 2
         update(self, *args, **kwargs)
     return wrapper
 
@@ -112,13 +151,15 @@ class State(enum.Enum):
 class Trig:
     """Collection of trigonometric methods."""
 
-    def vertices(n, r) -> list:
+    def vertices(n:int, r:float, start_angle:float=0) -> list:
         """Calculate the vertices of the polygon.
-        n:  number of vertices
-        r:  radius of circle inside the rectangle"""
+        n:      number of vertices
+        r:      radius of circle inside the rectangle
+        angle:  starting angle of the polygon"""
         angle = math.radians(360 / n)  # inner angle of polygon
+        start_angle = math.radians(start_angle)
         # 'r +' means here that origin is the rectangle's middlepoint
-        return [[int(r + r*math.sin(i*angle)), int(r + r*math.cos(i*angle))] for i in range(0, n)]
+        return [[int(r + r*math.sin(start_angle + i*angle)), int(r + r*math.cos(start_angle + i*angle))] for i in range(0, n)]
 
     def offset(speed:int, angle:float) -> tuple:
         """Calculate delta x and delta y offset coordinates.
@@ -178,7 +219,7 @@ class Timer:
 
 class Polygon(sprite.Sprite):
     """All game objects in Euclides are regular polygons.
-    This class has nothing else to do as to draw a certain sized and verticed regular polygon."""
+    This class draws a certain sized and verticed regular polygon on the surface."""
     def __init__(self, size:int, n:int, pos:tuple) -> None:
         """Prepare a sprite containing the polygon.
         size:   size of containing surface (rectangular area as the polygon is regular)
@@ -187,13 +228,13 @@ class Polygon(sprite.Sprite):
         super().__init__()
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
+        self._dx = self._dy = 0
+        self.angle = 180
+        self.color = pygame.Color(255, 255, 255)
         self._image = pygame.Surface((size, size))
+        self.rect = self._image.get_rect(center=pos)
         self._image.set_colorkey(self.image.get_at((0, 0)))
-        self.draw_polygon(pos)
-        # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
-        # this doesn't really matter in case of enemies and their bullets
-        self._image = pygame.transform.rotate(self._image, 180)
-        self._original_image = self._image.copy()
+        self.draw_polygon()
 
     @property
     def image(self) -> pygame.Surface:
@@ -205,9 +246,16 @@ class Polygon(sprite.Sprite):
         """Return the number of vertices."""
         return self._n
     
-    def draw_polygon(self, pos:tuple) -> None:
+    def update(self, *args, **kwargs) -> None:
+        """Update the polygon."""
+        self.rect.centerx += self._dx
+        self.rect.centery += self._dy
+    
+    def draw_polygon(self) -> None:
         """Draw the polygon."""
-        pygame.draw.polygon(self._image, WHITE, Trig.vertices(self._n, self.radius), 1)
+        pos = self.rect.center
+        self._image.fill(self.image.get_at((0, 0)))
+        pygame.draw.polygon(self._image, self.color, Trig.vertices(self.n, self.radius, self.angle), 1)
         self.rect = self._image.get_rect(center=pos)
 
 
@@ -222,7 +270,6 @@ class Spaceship(Polygon):
         pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__(size, n, pos)
         self._hull = n
-        self._fade = 255 // n  # each damage darkens the ship
         self._exploding = n + 1
         self._explosion_timer = Timer(EXPLOSION_COOLDOWN)
 
@@ -262,18 +309,20 @@ class Spaceship(Polygon):
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
         self.radius *= BLAST_RADIUS_INCREASE
-        self.draw_polygon(self.center_of_explosion)
+        self.draw_polygon()
         self.explosion_timer.reset()
 
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
         self._fadeout()
+        self.draw_polygon()
         self._ship_damage_sound.play()
 
     def _fadeout(self):
         """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        self._original_image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
+        fade = self._hull + 1
+        self.color = self.color.lerp(BLACK, 1 / fade)
 
 
 class Enemy(Spaceship):
@@ -295,11 +344,10 @@ class Enemy(Spaceship):
         return self._rotation_timer
 
     @rotate
-    @keep_on_screen
+    @knockback
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
+        super().update(*args, **kwargs)
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
@@ -333,17 +381,12 @@ class Player(Spaceship):
     def fire_rate_timer(self) -> bool:
         """Return the fire rate timer."""
         return self._fire_rate_timer
-    
-    def damage(self):
-        """Override spaciship class damage method."""
-        super().damage()
-        self._image = self._original_image.copy()
 
+    @follow_mouse
+    @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
-        state = kwargs.pop("state", None)
-        if state == State.PLAY:
-            self._keep_on_screen(*mouse.get_pos())
+        super().update(*args, **kwargs)
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
@@ -372,23 +415,6 @@ class Player(Spaceship):
         self._hull = PLAYER_VERTICES
         self.rect.center = PLAYER_START_POS
 
-    def _keep_on_screen(self, x:int, y:int) -> None:
-        """Always keep the whole player polygon on screen.
-        x:  intended next horizontal center coordinate
-        y:  intended next vertical center coordinate"""
-        edge_left = edge_top = self.rect.width // 2
-        edge_right = SCREEN_WIDTH - edge_left
-        edge_bottom = SCREEN_HEIGHT - edge_top
-        if x < edge_left:
-            x = edge_left
-        if x > edge_right:
-            x = edge_right
-        if y < edge_top:
-            y = edge_top
-        if y > edge_bottom:
-            y = edge_bottom
-        self.rect.center = (x, y)
-
 
 class Projectile(Polygon):
     """The polygon shoots same shaped projectiles."""
@@ -402,15 +428,11 @@ class Projectile(Polygon):
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
         self._rotation_timer = Timer(speed)
 
+    @remove_offscreen
     @rotate
     def update(self, *args, **kwargs) -> None:
         """Update the projectile sprite."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
-        # remove from group if it leaves the screen
-        if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
-            self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
-            self.kill()
+        super().update(*args, **kwargs)
 
 
 class PlainText(sprite.Sprite):
