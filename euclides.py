@@ -229,7 +229,7 @@ class Polygon(sprite.Sprite):
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
         self._dx = self._dy = 0
-        self.angle = 360
+        self.angle = 180
         self.color = pygame.Color(255, 255, 255)
         self._image = pygame.Surface((size, size))
         self.rect = self._image.get_rect(center=pos)
