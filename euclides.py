@@ -320,9 +320,8 @@ class Spaceship(Polygon):
 
     def _fadeout(self):
         """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        # fade = self._hull or 1
-        # self.color = self.color.lerp(BLACK, 1 / fade)
-        pass
+        fade = self._hull + 1
+        self.color = self.color.lerp(BLACK, 1 / fade)
 
 
 class Enemy(Spaceship):
