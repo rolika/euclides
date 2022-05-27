@@ -151,15 +151,16 @@ class State(enum.Enum):
 class Trig:
     """Collection of trigonometric methods."""
 
-    def vertices(n:int, r:float, start_angle:float=0) -> list:
+    def vertices(n:int, size:float, r:float, start_angle:float=0) -> list:
         """Calculate the vertices of the polygon.
         n:      number of vertices
+        size:   size of the containing rectangle
         r:      radius of circle inside the rectangle
         angle:  starting angle of the polygon"""
         angle = math.radians(360 / n)  # inner angle of polygon
         start_angle = math.radians(start_angle)
-        # 'r +' means here that origin is the rectangle's middlepoint
-        return [[int(r + r*math.sin(start_angle + i*angle)), int(r + r*math.cos(start_angle + i*angle))] for i in range(0, n)]
+        # 'size +' means here that origin is the rectangle's middlepoint
+        return [[int(size//2 + r*math.sin(start_angle + i*angle)), int(size//2 + r*math.cos(start_angle + i*angle))] for i in range(0, n)]
 
     def offset(speed:int, angle:float) -> tuple:
         """Calculate delta x and delta y offset coordinates.
@@ -231,6 +232,7 @@ class Polygon(sprite.Sprite):
         self._dx = self._dy = 0
         self.angle = 180
         self.color = pygame.Color(255, 255, 255)
+        self.size = size
         self._image = pygame.Surface((size, size))
         self.rect = self._image.get_rect(center=pos)
         self._image.set_colorkey(self.image.get_at((0, 0)))
@@ -253,10 +255,8 @@ class Polygon(sprite.Sprite):
     
     def draw_polygon(self) -> None:
         """Draw the polygon."""
-        pos = self.rect.center
         self._image.fill(self.image.get_at((0, 0)))
-        pygame.draw.polygon(self._image, self.color, Trig.vertices(self.n, self.radius, self.angle), 1)
-        self.rect = self._image.get_rect(center=pos)
+        pygame.draw.polygon(self._image, self.color, Trig.vertices(self.n, self.size, self.radius, self.angle), 1)
 
 
 class Spaceship(Polygon):
