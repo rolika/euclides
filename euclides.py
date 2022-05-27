@@ -157,8 +157,9 @@ class Trig:
         r:      radius of circle inside the rectangle
         angle:  starting angle of the polygon"""
         angle = math.radians(360 / n)  # inner angle of polygon
+        start_angle = math.radians(start_angle)
         # 'r +' means here that origin is the rectangle's middlepoint
-        return [[int(r + r*math.sin(i*angle)), int(r + r*math.cos(i*angle))] for i in range(0, n)]
+        return [[int(r + r*math.sin(start_angle + i*angle)), int(r + r*math.cos(start_angle + i*angle))] for i in range(0, n)]
 
     def offset(speed:int, angle:float) -> tuple:
         """Calculate delta x and delta y offset coordinates.
@@ -254,7 +255,7 @@ class Polygon(sprite.Sprite):
         """Draw the polygon."""
         pos = self.rect.center
         self._image.fill(self.image.get_at((0, 0)))
-        pygame.draw.polygon(self._image, self.color, Trig.vertices(self._n, self.radius, self.angle), 1)
+        pygame.draw.polygon(self._image, self.color, Trig.vertices(self.n, self.radius, self.angle), 1)
         self.rect = self._image.get_rect(center=pos)
 
 
