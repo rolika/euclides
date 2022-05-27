@@ -316,6 +316,7 @@ class Spaceship(Polygon):
         """Reduce hull by one."""
         self._hull -= 1
         self._fadeout()
+        self.draw_polygon()
         self._ship_damage_sound.play()
 
     def _fadeout(self):
