@@ -309,6 +309,7 @@ class Spaceship(Polygon):
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
         self.radius *= BLAST_RADIUS_INCREASE
+        self._lightup()
         self.draw_polygon()
         self.explosion_timer.reset()
 
@@ -321,8 +322,11 @@ class Spaceship(Polygon):
 
     def _fadeout(self):
         """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        fade = self._hull + 1
-        self.color = self.color.lerp(BLACK, 1 / fade)
+        self.color = self.color.lerp(BLACK, 1 / (self._hull + 1))
+    
+    def _lightup(self):
+        """Light up the spaceship if it is exploding."""
+        self.color = self.color.lerp(WHITE, 1 / (self._hull + 1))
 
 
 class Enemy(Spaceship):
