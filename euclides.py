@@ -137,7 +137,8 @@ def follow_mouse(update:callable) -> callable:
         """Call the update function and follow the mouse cursor in play mode."""
         state = kwargs.pop("state", None)
         if state == State.PLAY:
-            self.rect.center = mouse.get_pos()
+            self._dx = (mouse.get_pos()[0] - self.rect.centerx) // 2
+            self._dy = (mouse.get_pos()[1] - self.rect.centery) // 2
         update(self, *args, **kwargs)
     return wrapper
 
@@ -389,7 +390,7 @@ class Player(Spaceship):
     @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
-        pass
+        super().update(*args, **kwargs)
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
