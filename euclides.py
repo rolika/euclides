@@ -91,11 +91,8 @@ def rotate(update:callable) -> callable:
     def wrapper(self, *args, **kwargs) -> None:
         """Call the update function and rotate the enemy polygon."""        
         if self._dx and self._rotation_timer.is_ready():
-            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
-            pos = self.rect.center
-            self._image = pygame.transform.rotate(self._original_image, angle)
-            self.rect = self._image.get_rect()
-            self.rect.center = pos
+            self.angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
+            self.draw_polygon()
             self._rotation_timer.reset()
         update(self, *args, **kwargs)
     return wrapper
@@ -154,10 +151,11 @@ class State(enum.Enum):
 class Trig:
     """Collection of trigonometric methods."""
 
-    def vertices(n, r) -> list:
+    def vertices(n:int, r:float, start_angle:float=0) -> list:
         """Calculate the vertices of the polygon.
-        n:  number of vertices
-        r:  radius of circle inside the rectangle"""
+        n:      number of vertices
+        r:      radius of circle inside the rectangle
+        angle:  starting angle of the polygon"""
         angle = math.radians(360 / n)  # inner angle of polygon
         # 'r +' means here that origin is the rectangle's middlepoint
         return [[int(r + r*math.sin(i*angle)), int(r + r*math.cos(i*angle))] for i in range(0, n)]
@@ -220,7 +218,7 @@ class Timer:
 
 class Polygon(sprite.Sprite):
     """All game objects in Euclides are regular polygons.
-    This class has nothing else to do as to draw a certain sized and verticed regular polygon."""
+    This class draws a certain sized and verticed regular polygon on the surface."""
     def __init__(self, size:int, n:int, pos:tuple) -> None:
         """Prepare a sprite containing the polygon.
         size:   size of containing surface (rectangular area as the polygon is regular)
@@ -230,13 +228,12 @@ class Polygon(sprite.Sprite):
         self.radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
         self._dx = self._dy = 0
+        self.angle = 360
+        self.color = pygame.Color(255, 255, 255)
         self._image = pygame.Surface((size, size))
+        self.rect = self._image.get_rect(center=pos)
         self._image.set_colorkey(self.image.get_at((0, 0)))
-        self.draw_polygon(pos)
-        # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
-        # this doesn't really matter in case of enemies and their bullets
-        self._image = pygame.transform.rotate(self._image, 180)
-        self._original_image = self._image.copy()
+        self.draw_polygon()
 
     @property
     def image(self) -> pygame.Surface:
@@ -253,9 +250,11 @@ class Polygon(sprite.Sprite):
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
     
-    def draw_polygon(self, pos:tuple) -> None:
+    def draw_polygon(self) -> None:
         """Draw the polygon."""
-        pygame.draw.polygon(self._image, WHITE, Trig.vertices(self._n, self.radius), 1)
+        pos = self.rect.center
+        self._image.fill(self.image.get_at((0, 0)))
+        pygame.draw.polygon(self._image, self.color, Trig.vertices(self._n, self.radius, self.angle), 1)
         self.rect = self._image.get_rect(center=pos)
 
 
@@ -270,7 +269,6 @@ class Spaceship(Polygon):
         pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__(size, n, pos)
         self._hull = n
-        self._fade = 255 // n  # each damage darkens the ship
         self._exploding = n + 1
         self._explosion_timer = Timer(EXPLOSION_COOLDOWN)
 
@@ -310,7 +308,7 @@ class Spaceship(Polygon):
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
         self.radius *= BLAST_RADIUS_INCREASE
-        self.draw_polygon(self.center_of_explosion)
+        self.draw_polygon()
         self.explosion_timer.reset()
 
     def damage(self) -> None:
@@ -321,7 +319,9 @@ class Spaceship(Polygon):
 
     def _fadeout(self):
         """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        self._original_image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
+        # fade = self._hull or 1
+        # self.color = self.color.lerp(BLACK, 1 / fade)
+        pass
 
 
 class Enemy(Spaceship):
@@ -380,11 +380,6 @@ class Player(Spaceship):
     def fire_rate_timer(self) -> bool:
         """Return the fire rate timer."""
         return self._fire_rate_timer
-    
-    def damage(self):
-        """Override spaciship class damage method."""
-        super().damage()
-        self._image = self._original_image.copy()
 
     @follow_mouse
     @keep_on_screen
