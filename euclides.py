@@ -61,7 +61,7 @@ TITLE_MUSIC = "wav/title_music.wav"
 OVER_MUSIC = "wav/over_music.wav"
 
 EXPLOSION_COOLDOWN = 50
-BLAST_RADIUS_INCREASE = 1.05
+EXPLOSION_SCALE = 0.8
 
 
 def knockback(update:callable) -> callable:
@@ -308,7 +308,7 @@ class Spaceship(Polygon):
     def explode(self) -> None:
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
-        self.radius *= BLAST_RADIUS_INCREASE
+        self.radius *= EXPLOSION_SCALE
         self._lightup()
         self.draw_polygon()
         self.explosion_timer.reset()
