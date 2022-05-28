@@ -298,7 +298,6 @@ class Spaceship(Polygon):
     @property
     def is_destroyed(self) -> bool:
         """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
-        self._center_of_explosion = self._rect.center
         return self._hull < 1
 
     @property
@@ -310,11 +309,6 @@ class Spaceship(Polygon):
     def exploded(self) -> bool:
         """Retrun if the ship has exploded."""
         return self._exploding <= 0
-
-    @property
-    def center_of_explosion(self) -> tuple:
-        """Return the center of the explosion."""
-        return self._center_of_explosion
 
     @property
     def explosion_timer(self) -> Timer:
