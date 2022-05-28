@@ -89,7 +89,7 @@ def rotate(update:callable) -> callable:
     """Decorator function.
     Rotate the polygon by its angle. Vertical projectiles won't rotate."""
     def wrapper(self, *args, **kwargs) -> None:
-        """Call the update function and rotate the enemy polygon."""        
+        """Call the update function and rotate the enemy polygon."""
         if self._dx and self._rotation_timer.is_ready():
             self.angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
             self.draw_polygon()
@@ -247,12 +247,12 @@ class Polygon(sprite.Sprite):
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
-    
+
     def update(self, *args, **kwargs) -> None:
         """Update the polygon."""
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
-    
+
     def draw_polygon(self) -> None:
         """Draw the polygon."""
         self._image.fill(self.image.get_at((0, 0)))
@@ -284,49 +284,45 @@ class Spaceship(Polygon):
         """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
         self._center_of_explosion = self.rect.center
         return self._hull < 1
-    
+
     @property
     def is_exploding(self) -> bool:
         """Return True if ship is exploding, otherwise False."""
         return self._exploding <= self._n and self._exploding > 0
-    
+
     @property
     def exploded(self) -> bool:
         """Retrun if the ship has exploded."""
         return self._exploding <= 0
-    
+
     @property
     def center_of_explosion(self) -> tuple:
         """Return the center of the explosion."""
         return self._center_of_explosion
-    
+
     @property
     def explosion_timer(self) -> Timer:
         """Return the timer for the explosion."""
         return self._explosion_timer
-    
+
     def explode(self) -> None:
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
         self.radius *= EXPLOSION_SCALE
-        self._lightup()
+        self.color = self._shadeto(WHITE, self._hull + 1)
         self.draw_polygon()
         self.explosion_timer.reset()
 
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
-        self._fadeout()
+        self.color = self._shadeto(BLACK, self._hull + 1)
         self.draw_polygon()
         self._ship_damage_sound.play()
 
-    def _fadeout(self):
-        """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        self.color = self.color.lerp(BLACK, 1 / (self._hull + 1))
-    
-    def _lightup(self):
-        """Light up the spaceship if it is exploding."""
-        self.color = self.color.lerp(WHITE, 1 / (self._hull + 1))
+    def _shadeto(self, color:pygame.Color, amount:int) -> pygame.Color:
+        """Return a color that is a shade of the given color."""
+        return self.color.lerp(color, 1 / amount)
 
 
 class Enemy(Spaceship):
@@ -341,7 +337,7 @@ class Enemy(Spaceship):
         super().__init__(size, n, pos)
         self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
         self._rotation_timer = Timer(speed)
-    
+
     @property
     def rotation_timer(self) -> Timer:
         """Return the rotation timer."""
@@ -917,7 +913,7 @@ class Euclides:
                     self._exploding.add(ship)
             if self._player.is_destroyed:
                 self._player.kill()
-            
+
             # check exploding ships's state
             for ship in self._exploding:
                 if ship.explosion_timer.is_ready():
