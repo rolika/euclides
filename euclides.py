@@ -69,17 +69,17 @@ def knockback(update:callable) -> callable:
     Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
     def wrapper(self, *args, **kwargs) -> None:
         """Call the update function and bounce the enemy off screen edges."""
-        if self.rect.left < 0:
-            self.rect.left = 0
+        if self._rect.left < 0:
+            self._rect.left = 0
             self.turn_dx()
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH - 1
+        if self._rect.right > SCREEN_WIDTH:
+            self._rect.right = SCREEN_WIDTH - 1
             self.turn_dx()
-        if self.rect.top < 0:
-            self.rect.top = 0
+        if self._rect.top < 0:
+            self._rect.top = 0
             self.turn_dy()
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT - 1
+        if self._rect.bottom > SCREEN_HEIGHT:
+            self._rect.bottom = SCREEN_HEIGHT - 1
             self.turn_dy()
         update(self, *args, **kwargs)
     return wrapper
@@ -103,8 +103,8 @@ def remove_offscreen(update:callable) -> callable:
     Remove the sprite from its group if it goes off the screen."""
     def wrapper(self, *args, **kwargs) -> None:
         """Call the update function and remove the sprite from its group if it goes off the screen."""
-        if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
-            self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
+        if self._rect.centerx < 0 or self._rect.centerx > SCREEN_WIDTH or\
+            self._rect.centery < 0 or self._rect.centery > SCREEN_HEIGHT:
             self.kill()
         update(self, *args, **kwargs)
     return wrapper
@@ -115,14 +115,14 @@ def keep_on_screen(update:callable) -> callable:
     Keep the sprite on screen."""
     def wrapper(self, *args, **kwargs) -> None:
         """Call the update function and keep the sprite on screen."""
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH
-        if self.rect.top < 0:
-            self.rect.top = 0
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT
+        if self._rect.left < 0:
+            self._rect.left = 0
+        if self._rect.right > SCREEN_WIDTH:
+            self._rect.right = SCREEN_WIDTH
+        if self._rect.top < 0:
+            self._rect.top = 0
+        if self._rect.bottom > SCREEN_HEIGHT:
+            self._rect.bottom = SCREEN_HEIGHT
         update(self, *args, **kwargs)
     return wrapper
 
@@ -134,8 +134,8 @@ def follow_mouse(update:callable) -> callable:
         """Call the update function and follow the mouse cursor in play mode."""
         state = kwargs.pop("state", None)
         if state == State.PLAY:
-            self._dx = (mouse.get_pos()[0] - self.rect.centerx) // 2
-            self._dy = (mouse.get_pos()[1] - self.rect.centery) // 2
+            self._dx = (mouse.get_pos()[0] - self._rect.centerx) // 2
+            self._dy = (mouse.get_pos()[1] - self._rect.centery) // 2
         update(self, *args, **kwargs)
     return wrapper
 
@@ -234,7 +234,7 @@ class Polygon(sprite.Sprite):
         self._color = pygame.Color(255, 255, 255)
         self._size = size
         self._image = pygame.Surface((size, size))
-        self.rect = self._image.get_rect(center=pos)
+        self._rect = self._image.get_rect(center=pos)
         self._image.set_colorkey(self.image.get_at((0, 0)))
         self._draw_polygon()
 
@@ -242,6 +242,16 @@ class Polygon(sprite.Sprite):
     def image(self) -> pygame.Surface:
         """Return the image of the polygon."""
         return self._image
+    
+    @property
+    def rect(self) -> pygame.Rect:
+        """Return the rectangle of the polygon."""
+        return self._rect
+    
+    @rect.setter
+    def rect(self, value:pygame.Rect) -> None:
+        """Set the rectangle of the polygon."""
+        self._rect = value
     
     @property
     def radius(self) -> float:
@@ -255,8 +265,8 @@ class Polygon(sprite.Sprite):
 
     def update(self, *args, **kwargs) -> None:
         """Update the polygon."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
+        self._rect.centerx += self._dx
+        self._rect.centery += self._dy
 
     def _draw_polygon(self) -> None:
         """Draw the polygon."""
@@ -287,7 +297,7 @@ class Spaceship(Polygon):
     @property
     def is_destroyed(self) -> bool:
         """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
-        self._center_of_explosion = self.rect.center
+        self._center_of_explosion = self._rect.center
         return self._hull < 1
 
     @property
@@ -400,17 +410,17 @@ class Player(Spaceship):
         This method knocks back the enemy sprite avoiding overlapping.
         enemy: Enemy sprite"""
         overlap = None
-        if self.rect.top < enemy.rect.bottom:  # player is below
-            overlap = enemy.rect.bottom - self.rect.top
+        if self._rect.top < enemy.rect.bottom:  # player is below
+            overlap = enemy.rect.bottom - self._rect.top
             enemy.rect.bottom += overlap
-        if self.rect.left < enemy.rect.right:  # player is on right
-            overlap = enemy.rect.right - self.rect.left
+        if self._rect.left < enemy.rect.right:  # player is on right
+            overlap = enemy.rect.right - self._rect.left
             enemy.rect.right += overlap
-        if self.rect.bottom > enemy.rect.top:  # player is above
-            overlap = self.rect.bottom - enemy.rect.top
+        if self._rect.bottom > enemy.rect.top:  # player is above
+            overlap = self._rect.bottom - enemy.rect.top
             enemy.rect.top -= overlap
-        if self.rect.right > enemy.rect.left:  # player is on left
-            overlap = self.rect.right - enemy.rect.left
+        if self._rect.right > enemy.rect.left:  # player is on left
+            overlap = self._rect.right - enemy.rect.left
             enemy.rect.left -= overlap
         if overlap:
             self._bounce_off_sound.play()
@@ -420,7 +430,7 @@ class Player(Spaceship):
     def reset(self) -> None:
         """Player restarts the game."""
         self._hull = PLAYER_VERTICES
-        self.rect.center = PLAYER_START_POS
+        self._rect.center = PLAYER_START_POS
 
 
 class Projectile(Polygon):
