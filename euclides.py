@@ -60,23 +60,26 @@ BOUNCE_OFF = "wav/bounce_off.wav"
 TITLE_MUSIC = "wav/title_music.wav"
 OVER_MUSIC = "wav/over_music.wav"
 
+EXPLOSION_COOLDOWN = 50
+EXPLOSION_SCALE = 0.8
 
-def keep_on_screen(update:callable) -> callable:
+
+def knockback(update:callable) -> callable:
     """Decorator function.
     Always keep the whole enemy polygon on screen, by bouncing it off at screen edges."""
     def wrapper(self, *args, **kwargs) -> None:
         """Call the update function and bounce the enemy off screen edges."""
-        if self.rect.left < 0:
-            self.rect.left = 0
+        if self._rect.left < 0:
+            self._rect.left = 0
             self.turn_dx()
-        if self.rect.right > SCREEN_WIDTH:
-            self.rect.right = SCREEN_WIDTH - 1
+        if self._rect.right > SCREEN_WIDTH:
+            self._rect.right = SCREEN_WIDTH - 1
             self.turn_dx()
-        if self.rect.top < 0:
-            self.rect.top = 0
+        if self._rect.top < 0:
+            self._rect.top = 0
             self.turn_dy()
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT - 1
+        if self._rect.bottom > SCREEN_HEIGHT:
+            self._rect.bottom = SCREEN_HEIGHT - 1
             self.turn_dy()
         update(self, *args, **kwargs)
     return wrapper
@@ -86,14 +89,53 @@ def rotate(update:callable) -> callable:
     """Decorator function.
     Rotate the polygon by its angle. Vertical projectiles won't rotate."""
     def wrapper(self, *args, **kwargs) -> None:
-        """Call the update function and rotate the enemy polygon."""        
+        """Call the update function and rotate the enemy polygon."""
         if self._dx and self._rotation_timer.is_ready():
-            angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
-            pos = self.rect.center
-            self._image = pygame.transform.rotate(self._original_image, angle)
-            self.rect = self._image.get_rect()
-            self.rect.center = pos
+            self._angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
+            self._draw_polygon()
             self._rotation_timer.reset()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def remove_offscreen(update:callable) -> callable:
+    """Decorator function.
+    Remove the sprite from its group if it goes off the screen."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and remove the sprite from its group if it goes off the screen."""
+        if self._rect.centerx < 0 or self._rect.centerx > SCREEN_WIDTH or\
+            self._rect.centery < 0 or self._rect.centery > SCREEN_HEIGHT:
+            self.kill()
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def keep_on_screen(update:callable) -> callable:
+    """Decorator function.
+    Keep the sprite on screen."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and keep the sprite on screen."""
+        if self._rect.left < 0:
+            self._rect.left = 0
+        if self._rect.right > SCREEN_WIDTH:
+            self._rect.right = SCREEN_WIDTH
+        if self._rect.top < 0:
+            self._rect.top = 0
+        if self._rect.bottom > SCREEN_HEIGHT:
+            self._rect.bottom = SCREEN_HEIGHT
+        update(self, *args, **kwargs)
+    return wrapper
+
+
+def follow_mouse(update:callable) -> callable:
+    """Decorator function.
+    Follow the mouse cursor."""
+    def wrapper(self, *args, **kwargs) -> None:
+        """Call the update function and follow the mouse cursor in play mode."""
+        state = kwargs.pop("state", None)
+        if state == State.PLAY:
+            self._dx = (mouse.get_pos()[0] - self._rect.centerx) // 2
+            self._dy = (mouse.get_pos()[1] - self._rect.centery) // 2
         update(self, *args, **kwargs)
     return wrapper
 
@@ -109,13 +151,16 @@ class State(enum.Enum):
 class Trig:
     """Collection of trigonometric methods."""
 
-    def vertices(n, r) -> list:
+    def vertices(n:int, size:float, r:float, start_angle:float=0) -> list:
         """Calculate the vertices of the polygon.
-        n:  number of vertices
-        r:  radius of circle inside the rectangle"""
+        n:      number of vertices
+        size:   size of the containing rectangle
+        r:      radius of circle inside the rectangle
+        angle:  starting angle of the polygon"""
         angle = math.radians(360 / n)  # inner angle of polygon
-        # 'r +' means here that origin is the rectangle's middlepoint
-        return [[int(r + r*math.sin(i*angle)), int(r + r*math.cos(i*angle))] for i in range(0, n)]
+        start_angle = math.radians(start_angle)
+        # 'size +' means here that origin is the rectangle's middlepoint
+        return [[int(size//2 + r*math.sin(start_angle + i*angle)), int(size//2 + r*math.cos(start_angle + i*angle))] for i in range(0, n)]
 
     def offset(speed:int, angle:float) -> tuple:
         """Calculate delta x and delta y offset coordinates.
@@ -133,35 +178,100 @@ class Trig:
         return math.atan2(dy, dx)
 
 
+class Timer:
+    """Timer for the game."""
+    def __init__(self, cooldown:int) -> None:
+        """Initialize a timer object.
+        cooldown:  time in milliseconds between each update"""
+        self._cooldown = cooldown
+        self._last_update = START_TIME
+        self._counter = 1
+
+    @property
+    def cooldown(self) -> int:
+        """Return the cooldown time in milliseconds."""
+        return self._cooldown
+
+    @cooldown.setter
+    def cooldown(self, value:int) -> None:
+        """Set the cooldown time in milliseconds."""
+        self._cooldown = value
+
+    @property
+    def counter(self) -> int:
+        """Return the counter."""
+        return self._counter
+
+    def reset(self) -> None:
+        """Reset the timer."""
+        self._last_update = time.get_ticks()
+
+    def reset_counter(self) -> None:
+        """Reset the counter."""
+        self._counter = 1
+
+    def is_ready(self) -> bool:
+        """Check if the timer is ready for an action."""
+        self._counter += 1
+        now = time.get_ticks()
+        time_since_last_update = now - self._last_update
+        return time_since_last_update >= self._cooldown
+
+
 class Polygon(sprite.Sprite):
     """All game objects in Euclides are regular polygons.
-    This class has nothing else to do as to draw a certain sized and verticed regular polygon."""
+    This class draws a certain sized and verticed regular polygon on the surface."""
     def __init__(self, size:int, n:int, pos:tuple) -> None:
         """Prepare a sprite containing the polygon.
         size:   size of containing surface (rectangular area as the polygon is regular)
         n:      number of vertices
         pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__()
-        self.radius = size // 2 # used by sprite.collide_circle as well
+        self._radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
+        self._dx = self._dy = 0
+        self._angle = 180
+        self._color = pygame.Color(255, 255, 255)
+        self._size = size
         self._image = pygame.Surface((size, size))
+        self._rect = self._image.get_rect(center=pos)
         self._image.set_colorkey(self.image.get_at((0, 0)))
-        pygame.draw.polygon(self._image, WHITE, Trig.vertices(n, self.radius), 1)
-        self.rect = self._image.get_rect(center=pos)
-        # to look like a starship or its projectile, turn upside down, so the player's triangle's tip shows upwards
-        # this doesn't really matter in case of enemies and their bullets
-        self._image = pygame.transform.rotate(self._image, 180)
-        self._original_image = self._image.copy()
+        self._draw_polygon()
 
     @property
     def image(self) -> pygame.Surface:
         """Return the image of the polygon."""
         return self._image
+    
+    @property
+    def rect(self) -> pygame.Rect:
+        """Return the rectangle of the polygon."""
+        return self._rect
+    
+    @rect.setter
+    def rect(self, value:pygame.Rect) -> None:
+        """Set the rectangle of the polygon."""
+        self._rect = value
+    
+    @property
+    def radius(self) -> float:
+        """Return the radius of the polygon."""
+        return self._radius
 
     @property
     def n(self) -> int:
         """Return the number of vertices."""
         return self._n
+
+    def update(self, *args, **kwargs) -> None:
+        """Update the polygon."""
+        self._rect.centerx += self._dx
+        self._rect.centery += self._dy
+
+    def _draw_polygon(self) -> None:
+        """Draw the polygon."""
+        self._image.fill(self.image.get_at((0, 0)))
+        pygame.draw.polygon(self._image, self._color, Trig.vertices(self.n, self._size, self._radius, self._angle), 1)
 
 
 class Spaceship(Polygon):
@@ -175,33 +285,60 @@ class Spaceship(Polygon):
         pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__(size, n, pos)
         self._hull = n
-        self._fade = 255 // n  # each damage darkens the ship
+        self._exploding = n + 1
+        self._explosion_timer = Timer(EXPLOSION_COOLDOWN)
 
         # setup sounds
         self._ship_damage_sound = mixer.Sound(ENEMY_HULL_DAMAGE)
         self._ship_damage_sound.set_volume(0.5)
-        self._ship_destroyed_sound = mixer.Sound(EXPLOSION)
-        self._ship_destroyed_sound.set_volume(1)
         self._bounce_off_sound = mixer.Sound(BOUNCE_OFF)
         self._bounce_off_sound.set_volume(0.5)
 
     @property
     def is_destroyed(self) -> bool:
         """Return True if hull reduced below 1 (ship is destroyed), otherwise False (ship is still alive)."""
+        self._center_of_explosion = self._rect.center
         return self._hull < 1
+
+    @property
+    def is_exploding(self) -> bool:
+        """Return True if ship is exploding, otherwise False."""
+        return self._exploding <= self._n and self._exploding > 0
+
+    @property
+    def exploded(self) -> bool:
+        """Retrun if the ship has exploded."""
+        return self._exploding <= 0
+
+    @property
+    def center_of_explosion(self) -> tuple:
+        """Return the center of the explosion."""
+        return self._center_of_explosion
+
+    @property
+    def explosion_timer(self) -> Timer:
+        """Return the timer for the explosion."""
+        return self._explosion_timer
+
+    def explode(self) -> None:
+        """Explode the ship, that is, advance the explosion frame."""
+        self._exploding -= 1
+        self._radius *= EXPLOSION_SCALE
+        self._color = self._shadeto(WHITE, self._hull + 1)
+        self._draw_polygon()
+        self.explosion_timer.reset()
 
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
-        self._fadeout()
+        self._color = self._shadeto(BLACK, self._hull + 1)
+        self._draw_polygon()
         self._ship_damage_sound.play()
-        if self.is_destroyed:
-            self._ship_destroyed_sound.play()
-            self.kill()
 
-    def _fadeout(self):
-        """Fade spaceship to grey if damaged; subtract the blend color from the base color."""
-        self._original_image.fill((self._fade, self._fade, self._fade), None, BLEND_SUB)
+    def _shadeto(self, color:pygame.Color, amount:int) -> pygame.Color:
+        """Return a color that is a shade of the given color."""
+        amount = amount or 1
+        return self._color.lerp(color, 1 / amount)
 
 
 class Enemy(Spaceship):
@@ -217,12 +354,16 @@ class Enemy(Spaceship):
         self._dx, self._dy = Trig.offset(speed, angle)  # enemies move right away after spawning
         self._rotation_timer = Timer(speed)
 
+    @property
+    def rotation_timer(self) -> Timer:
+        """Return the rotation timer."""
+        return self._rotation_timer
+
     @rotate
-    @keep_on_screen
+    @knockback
     def update(self, *args, **kwargs) -> None:
         """Update the enemy sprite."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
+        super().update(*args, **kwargs)
 
     def turn_dx(self) -> None:
         """Turn around horizontal movement."""
@@ -256,34 +397,29 @@ class Player(Spaceship):
     def fire_rate_timer(self) -> bool:
         """Return the fire rate timer."""
         return self._fire_rate_timer
-    
-    def damage(self):
-        """Override spaciship class damage method."""
-        super().damage()
-        self._image = self._original_image.copy()
 
+    @follow_mouse
+    @keep_on_screen
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
-        state = kwargs.pop("state", None)
-        if state == State.PLAY:
-            self._keep_on_screen(*mouse.get_pos())
+        super().update(*args, **kwargs)
 
     def knockback(self, enemy:Enemy):
         """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
         This method knocks back the enemy sprite avoiding overlapping.
         enemy: Enemy sprite"""
         overlap = None
-        if self.rect.top < enemy.rect.bottom:  # player is below
-            overlap = enemy.rect.bottom - self.rect.top
+        if self._rect.top < enemy.rect.bottom:  # player is below
+            overlap = enemy.rect.bottom - self._rect.top
             enemy.rect.bottom += overlap
-        if self.rect.left < enemy.rect.right:  # player is on right
-            overlap = enemy.rect.right - self.rect.left
+        if self._rect.left < enemy.rect.right:  # player is on right
+            overlap = enemy.rect.right - self._rect.left
             enemy.rect.right += overlap
-        if self.rect.bottom > enemy.rect.top:  # player is above
-            overlap = self.rect.bottom - enemy.rect.top
+        if self._rect.bottom > enemy.rect.top:  # player is above
+            overlap = self._rect.bottom - enemy.rect.top
             enemy.rect.top -= overlap
-        if self.rect.right > enemy.rect.left:  # player is on left
-            overlap = self.rect.right - enemy.rect.left
+        if self._rect.right > enemy.rect.left:  # player is on left
+            overlap = self._rect.right - enemy.rect.left
             enemy.rect.left -= overlap
         if overlap:
             self._bounce_off_sound.play()
@@ -293,24 +429,7 @@ class Player(Spaceship):
     def reset(self) -> None:
         """Player restarts the game."""
         self._hull = PLAYER_VERTICES
-        self.rect.center = PLAYER_START_POS
-
-    def _keep_on_screen(self, x:int, y:int) -> None:
-        """Always keep the whole player polygon on screen.
-        x:  intended next horizontal center coordinate
-        y:  intended next vertical center coordinate"""
-        edge_left = edge_top = self.rect.width // 2
-        edge_right = SCREEN_WIDTH - edge_left
-        edge_bottom = SCREEN_HEIGHT - edge_top
-        if x < edge_left:
-            x = edge_left
-        if x > edge_right:
-            x = edge_right
-        if y < edge_top:
-            y = edge_top
-        if y > edge_bottom:
-            y = edge_bottom
-        self.rect.center = (x, y)
+        self._rect.center = PLAYER_START_POS
 
 
 class Projectile(Polygon):
@@ -325,15 +444,11 @@ class Projectile(Polygon):
         self._dx, self._dy = Trig.offset(speed, angle)  # projectiles move right away after spawning
         self._rotation_timer = Timer(speed)
 
+    @remove_offscreen
     @rotate
     def update(self, *args, **kwargs) -> None:
         """Update the projectile sprite."""
-        self.rect.centerx += self._dx
-        self.rect.centery += self._dy
-        # remove from group if it leaves the screen
-        if self.rect.centerx < 0 or self.rect.centerx > SCREEN_WIDTH or\
-            self.rect.centery < 0 or self.rect.centery > SCREEN_HEIGHT:
-            self.kill()
+        super().update(*args, **kwargs)
 
 
 class PlainText(sprite.Sprite):
@@ -404,7 +519,7 @@ class OnScreen(sprite.RenderUpdates):
         sprites:    any number of sprite objects"""
         super().__init__(*sprites)
 
-    def update(self, *args, **kwargs) -> None:
+    def update(self, *args, **kwargs):
         """Handle sprites within the group.
         screen: game's display Surface"""
         screen = kwargs.pop("screen", None)
@@ -412,6 +527,14 @@ class OnScreen(sprite.RenderUpdates):
         changed = self.draw(screen)
         super().update(*args, **kwargs)
         return changed
+
+
+class Exploding(OnScreen):
+    """Container for exploding sprite objects."""
+    def __init__(self, *sprites:Polygon) -> None:
+        """Uses default initialization.
+        sprites:    any number of sprite objects"""
+        super().__init__(*sprites)
 
 
 class Wave(OnScreen):
@@ -454,46 +577,6 @@ class Wave(OnScreen):
     def reset_level(self) -> None:
         """When player starts a new level."""
         self._fire_rate_timer = Timer(ENEMY_WAVE_STARTING_FIRE_COOLDOWN)
-
-
-class Timer:
-    """Timer for the game."""
-    def __init__(self, cooldown:int) -> None:
-        """Initialize a timer object.
-        cooldown:  time in milliseconds between each update"""
-        self._cooldown = cooldown
-        self._last_update = START_TIME
-        self._counter = 1
-
-    @property
-    def cooldown(self) -> int:
-        """Return the cooldown time in milliseconds."""
-        return self._cooldown
-
-    @cooldown.setter
-    def cooldown(self, value:int) -> None:
-        """Set the cooldown time in milliseconds."""
-        self._cooldown = value
-
-    @property
-    def counter(self) -> int:
-        """Return the counter."""
-        return self._counter
-
-    def reset(self) -> None:
-        """Reset the timer."""
-        self._last_update = time.get_ticks()
-
-    def reset_counter(self) -> None:
-        """Reset the counter."""
-        self._counter = 1
-
-    def is_ready(self) -> bool:
-        """Check if the timer is ready for an action."""
-        self._counter += 1
-        now = time.get_ticks()
-        time_since_last_update = now - self._last_update
-        return time_since_last_update >= self._cooldown
 
 
 class Swarm(OnScreen):
@@ -683,6 +766,7 @@ class Euclides:
         self._fire = Swarm()  # container for player's projectiles
         self._hostile = Wave()  # container for enemy spacecrafts
         self._hostile_fire = Swarm()  # container for enemy projectiles
+        self._exploding = Exploding()  # container for exploding spacecrafts
         self._onscreen = OnScreen()  # container for sprites on screen
 
         # setup sound
@@ -690,6 +774,8 @@ class Euclides:
         self._engine_startup.set_volume(0.5)
         self._energy_hum = mixer.Sound("wav/energy_hum.wav")
         self._energy_hum.set_volume(0.5)
+        self._ship_destroyed_sound = mixer.Sound(EXPLOSION)
+        self._ship_destroyed_sound.set_volume(1)
 
         self._main()
 
@@ -766,7 +852,7 @@ class Euclides:
     def _play(self, screen) -> State:
         """Play the game.
         screen: pygame display"""
-        self._set_screen(self._score, self._highscore, self._hostile)
+        self._set_screen(self._score, self._highscore, self._hostile, self._exploding)
 
         size = ENEMY_STARTING_SIZE
         n = 3
@@ -835,6 +921,22 @@ class Euclides:
 
             # check player collisions with enemy craft
             self._hostile.contact(self._player)
+
+            # check destroyed starhips
+            for ship in self._hostile:
+                if ship.is_destroyed:
+                    self._hostile.remove(ship)
+                    self._exploding.add(ship)
+            if self._player.is_destroyed:
+                self._player.kill()
+
+            # check exploding ships's state
+            for ship in self._exploding:
+                if ship.explosion_timer.is_ready():
+                    ship.explode()
+                if ship.exploded:
+                    ship.kill()
+                    self._ship_destroyed_sound.play()
 
             # check if player is still alive
             if not self._player.alive():
