@@ -19,6 +19,7 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
 FPS = 60
+SLOWMO = 5
 
 PLAYER_SIZE = 40
 PLAYER_VERTICES = 3  # a triangle
@@ -866,7 +867,7 @@ class Euclides:
         mixer.music.fadeout(500)
 
         while True:
-            time.Clock().tick(FPS)
+            time.Clock().tick(SLOWMO if self._player.is_exploding else FPS)
             screen.fill(BLACK)
 
             # listen for user actions
@@ -928,7 +929,7 @@ class Euclides:
                     self._hostile.remove(ship)
                     self._exploding.add(ship)
             if self._player.is_destroyed:
-                self._player.kill()
+                self._exploding.add(self._player)
 
             # check exploding ships's state
             for ship in self._exploding:
