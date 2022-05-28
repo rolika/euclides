@@ -91,8 +91,8 @@ def rotate(update:callable) -> callable:
     def wrapper(self, *args, **kwargs) -> None:
         """Call the update function and rotate the enemy polygon."""
         if self._dx and self._rotation_timer.is_ready():
-            self.angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
-            self.draw_polygon()
+            self._angle = self.n * math.copysign(1, self._dx) * self._rotation_timer.counter * -1
+            self._draw_polygon()
             self._rotation_timer.reset()
         update(self, *args, **kwargs)
     return wrapper
@@ -227,21 +227,26 @@ class Polygon(sprite.Sprite):
         n:      number of vertices
         pos:    tuple of x, y coordinates, where the polygon should apper (rect.center)"""
         super().__init__()
-        self.radius = size // 2 # used by sprite.collide_circle as well
+        self._radius = size // 2 # used by sprite.collide_circle as well
         self._n = n
         self._dx = self._dy = 0
-        self.angle = 180
-        self.color = pygame.Color(255, 255, 255)
-        self.size = size
+        self._angle = 180
+        self._color = pygame.Color(255, 255, 255)
+        self._size = size
         self._image = pygame.Surface((size, size))
         self.rect = self._image.get_rect(center=pos)
         self._image.set_colorkey(self.image.get_at((0, 0)))
-        self.draw_polygon()
+        self._draw_polygon()
 
     @property
     def image(self) -> pygame.Surface:
         """Return the image of the polygon."""
         return self._image
+    
+    @property
+    def radius(self) -> float:
+        """Return the radius of the polygon."""
+        return self._radius
 
     @property
     def n(self) -> int:
@@ -253,10 +258,10 @@ class Polygon(sprite.Sprite):
         self.rect.centerx += self._dx
         self.rect.centery += self._dy
 
-    def draw_polygon(self) -> None:
+    def _draw_polygon(self) -> None:
         """Draw the polygon."""
         self._image.fill(self.image.get_at((0, 0)))
-        pygame.draw.polygon(self._image, self.color, Trig.vertices(self.n, self.size, self.radius, self.angle), 1)
+        pygame.draw.polygon(self._image, self._color, Trig.vertices(self.n, self._size, self._radius, self._angle), 1)
 
 
 class Spaceship(Polygon):
@@ -308,21 +313,23 @@ class Spaceship(Polygon):
     def explode(self) -> None:
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
-        self.radius *= EXPLOSION_SCALE
-        self.color = self._shadeto(WHITE, self._hull + 1)
-        self.draw_polygon()
+        self._radius *= EXPLOSION_SCALE
+        self._color = self._shadeto(WHITE, self._hull + 1)
+        self._draw_polygon()
         self.explosion_timer.reset()
 
     def damage(self) -> None:
         """Reduce hull by one."""
         self._hull -= 1
-        self.color = self._shadeto(BLACK, self._hull + 1)
-        self.draw_polygon()
+        self._color = self._shadeto(BLACK, self._hull + 1)
+        self._draw_polygon()
         self._ship_damage_sound.play()
 
     def _shadeto(self, color:pygame.Color, amount:int) -> pygame.Color:
         """Return a color that is a shade of the given color."""
-        return self.color.lerp(color, 1 / amount)
+        if amount == 0:
+            amount = 1
+        return self._color.lerp(color, 1 / amount)
 
 
 class Enemy(Spaceship):
