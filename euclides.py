@@ -337,8 +337,7 @@ class Spaceship(Polygon):
 
     def _shadeto(self, color:pygame.Color, amount:int) -> pygame.Color:
         """Return a color that is a shade of the given color."""
-        if amount == 0:
-            amount = 1
+        amount = amount or 1
         return self._color.lerp(color, 1 / amount)
 
 
