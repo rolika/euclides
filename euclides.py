@@ -332,7 +332,8 @@ class Spaceship(Polygon):
 
     def _shadeto(self, color:pygame.Color, amount:int) -> pygame.Color:
         """Return a color that is a shade of the given color."""
-        amount = amount or 1
+        if amount <= 0:
+            amount = 1
         return self._color.lerp(color, 1 / amount)
 
 
@@ -562,6 +563,11 @@ class Wave(OnScreen):
             player.knockback(enemy)
             enemy.damage()
             player.damage()
+    
+    def collide(self, enemy:Enemy) -> Enemy:
+        """Collide with fellow enemy.
+        enemy:  enemy sprite"""
+        return sprite.spritecollideany(enemy, self, collided=sprite.collide_circle)
 
     def reset_game(self):
         """When player restarts the game."""
@@ -889,6 +895,15 @@ class Euclides:
                     angle = math.radians(random.randrange(315, 345, 1))
                     self._hostile.add(Enemy(size, n, (x, y), speed, angle))
                 self._onscreen.add(self._hostile)
+            
+            # enemies bounce off of each other
+            for enemy in self._hostile:
+                bounce = self._hostile.collide(enemy)
+                if bounce:
+                    enemy.turn_dx()
+                    enemy.turn_dy()
+                    bounce.turn_dx()
+                    bounce.turn_dy()
 
             # shoot player projectiles
             if self._player.fire_rate_timer.is_ready() and self._player.fires:
