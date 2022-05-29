@@ -315,6 +315,14 @@ class Spaceship(Polygon):
         """Return the timer for the explosion."""
         return self._explosion_timer
 
+    def turn_dx(self) -> None:
+        """Turn around horizontal movement."""
+        self._dx = -self._dx
+
+    def turn_dy(self) -> None:
+        """Turn around vertical movement."""
+        self._dy = -self._dy
+
     def explode(self) -> None:
         """Explode the ship, that is, advance the explosion frame."""
         self._exploding -= 1
@@ -334,6 +342,27 @@ class Spaceship(Polygon):
         """Bounce off the sprite in the opposite direction."""
         self._dx = -self._dx
         self._dy = -self._dy
+
+    def knockback(self, ship) -> None:
+        """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
+        This method knocks back the enemy sprite avoiding overlapping.
+        ship:   player or enemy sprite"""
+        overlap = None
+        if self._rect.top < ship.rect.bottom:  # self is below
+            overlap = ship.rect.bottom - self._rect.top
+            ship.rect.bottom += overlap
+        if self._rect.left < ship.rect.right:  # self is on right
+            overlap = ship.rect.right - self._rect.left
+            ship.rect.right += overlap
+        if self._rect.bottom > ship.rect.top:  # self is above
+            overlap = self._rect.bottom - ship.rect.top
+            ship.rect.top -= overlap
+        if self._rect.right > ship.rect.left:  # self is on left
+            overlap = self._rect.right - ship.rect.left
+            ship.rect.left -= overlap
+        if overlap:
+            self._bounce_off_sound.play()
+            ship.bounce_off()
 
     def _shadeto(self, color:pygame.Color, amount:int) -> pygame.Color:
         """Return a color that is a shade of the given color."""
@@ -366,14 +395,6 @@ class Enemy(Spaceship):
         """Update the enemy sprite."""
         super().update(*args, **kwargs)
 
-    def turn_dx(self) -> None:
-        """Turn around horizontal movement."""
-        self._dx = -self._dx
-
-    def turn_dy(self) -> None:
-        """Turn around vertical movement."""
-        self._dy = -self._dy
-
 
 class Player(Spaceship):
     """Player is represented by a regular triangle-shaped spaceship."""
@@ -404,27 +425,6 @@ class Player(Spaceship):
     def update(self, *args, **kwargs) -> None:
         """Update the player sprite. The ship is controlled by mouse movement by its center point."""
         super().update(*args, **kwargs)
-
-    def knockback(self, enemy:Enemy):
-        """Player and enemies shouldn't overlap each other, because their hull gets too fast exhausted from collision.
-        This method knocks back the enemy sprite avoiding overlapping.
-        enemy: Enemy sprite"""
-        overlap = None
-        if self._rect.top < enemy.rect.bottom:  # player is below
-            overlap = enemy.rect.bottom - self._rect.top
-            enemy.rect.bottom += overlap
-        if self._rect.left < enemy.rect.right:  # player is on right
-            overlap = enemy.rect.right - self._rect.left
-            enemy.rect.right += overlap
-        if self._rect.bottom > enemy.rect.top:  # player is above
-            overlap = self._rect.bottom - enemy.rect.top
-            enemy.rect.top -= overlap
-        if self._rect.right > enemy.rect.left:  # player is on left
-            overlap = self._rect.right - enemy.rect.left
-            enemy.rect.left -= overlap
-        if overlap:
-            self._bounce_off_sound.play()
-            enemy.bounce_off()
 
     def reset(self) -> None:
         """Player restarts the game."""
