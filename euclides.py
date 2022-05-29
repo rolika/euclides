@@ -563,7 +563,7 @@ class Wave(OnScreen):
     def contact(self, player:sprite.Sprite):
         """Detect collision between player and enemy polygons and reduce their hull.
         player:     player sprite"""
-        for enemy in sprite.spritecollide(player, self, False, sprite.collide_circle):
+        if enemy := self.collide(player):
             player.knockback(enemy)
             enemy.damage()
             player.damage()
