@@ -329,6 +329,11 @@ class Spaceship(Polygon):
         self._color = self._shadeto(BLACK, self._hull + 1)
         self._draw_polygon()
         self._ship_damage_sound.play()
+    
+    def bounce_off(self) -> None:
+        """Bounce off the sprite in the opposite direction."""
+        self._dx = -self._dx
+        self._dy = -self._dy
 
     def _shadeto(self, color:pygame.Color, amount:int) -> pygame.Color:
         """Return a color that is a shade of the given color."""
@@ -419,8 +424,7 @@ class Player(Spaceship):
             enemy.rect.left -= overlap
         if overlap:
             self._bounce_off_sound.play()
-            enemy.turn_dy()
-            enemy.turn_dx()
+            enemy.bounce_off()
 
     def reset(self) -> None:
         """Player restarts the game."""
@@ -564,10 +568,10 @@ class Wave(OnScreen):
             enemy.damage()
             player.damage()
     
-    def collide(self, enemy:Enemy) -> Enemy:
-        """Collide with fellow enemy.
-        enemy:  enemy sprite"""
-        return sprite.spritecollideany(enemy, self, collided=sprite.collide_circle)
+    def collide(self, ship:Spaceship) -> Enemy:
+        """Collide with other sapceship.
+        ship:   player or enemy sprite"""
+        return sprite.spritecollideany(ship, self, collided=sprite.collide_circle)
 
     def reset_game(self):
         """When player restarts the game."""
@@ -890,20 +894,22 @@ class Euclides:
                 n += 1
                 speed += ENEMY_SPEED_INCREMENT
                 for i in range(n):
-                    x = random.randrange(0, SCREEN_WIDTH, 1)
-                    y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
-                    angle = math.radians(random.randrange(315, 345, 1))
-                    self._hostile.add(Enemy(size, n, (x, y), speed, angle))
+                    while True:
+                        x = random.randrange(0, SCREEN_WIDTH, 1)
+                        y = random.randrange(0, SCREEN_HEIGHT // 2, 1)
+                        angle = math.radians(random.randrange(315, 345, 1))
+                        enemy = Enemy(size, n, (x, y), speed, angle)
+                        if not self._hostile.collide(enemy):
+                            break
+                    self._hostile.add(enemy)
                 self._onscreen.add(self._hostile)
             
             # enemies bounce off of each other
             for enemy in self._hostile:
-                bounce = self._hostile.collide(enemy)
-                if bounce:
-                    enemy.turn_dx()
-                    enemy.turn_dy()
-                    bounce.turn_dx()
-                    bounce.turn_dy()
+                ship = self._hostile.collide(enemy)
+                if ship:
+                    enemy.bounce_off()
+                    ship.bounce_off()
 
             # shoot player projectiles
             if self._player.fire_rate_timer.is_ready() and self._player.fires:
